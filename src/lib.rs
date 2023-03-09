@@ -2,10 +2,9 @@ use rayon::prelude::*;
 use std::{
     any::{Any, TypeId},
     collections::HashMap,
+    marker::PhantomData,
     num::NonZeroUsize,
 };
-
-pub type SystemType<T> = Box<dyn Fn(Entity, &mut T) + Send + Sync>;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Entity {
@@ -19,7 +18,6 @@ trait ComponentContainerTrait: Any + Send + Sync {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
     fn remove_entity(&mut self, entity: Entity);
-    fn run_systems(&mut self);
 }
 
 impl dyn ComponentContainerTrait {
@@ -37,14 +35,12 @@ impl dyn ComponentContainerTrait {
 struct ComponentContainer<T: Component> {
     // TODO: we are trimming the end off when removing components, but what about trimming the front?
     components: Vec<Option<(NonZeroUsize, T)>>,
-    systems: Vec<SystemType<T>>,
 }
 
 impl<T: Component> Default for ComponentContainer<T> {
     fn default() -> Self {
         Self {
             components: Vec::default(),
-            systems: Vec::default(),
         }
     }
 }
@@ -56,19 +52,6 @@ impl<T: Component> ComponentContainerTrait for ComponentContainer<T> {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
-    }
-
-    fn run_systems(&mut self) {
-        self.systems.iter_mut().for_each(|system| {
-            self.components
-                .par_iter_mut()
-                .enumerate()
-                .for_each(|(id, data)| {
-                    if let &mut Some((gen, ref mut component)) = data {
-                        system(Entity { id, gen }, component);
-                    }
-                });
-        });
     }
 
     fn remove_entity(&mut self, entity: Entity) {
@@ -85,13 +68,36 @@ impl<T: Component> ComponentContainerTrait for ComponentContainer<T> {
     }
 }
 
+type ComponentContainers = HashMap<TypeId, Box<dyn ComponentContainerTrait>>;
+pub struct SystemParam<'a>(&'a mut ComponentContainers);
+
 pub trait System {
-    fn run_system(&self, ecs: &mut ECS);
+    fn run_system(&self, ecs: SystemParam<'_>);
 }
 
-impl<T: Component, F: Fn(Entity, &mut T)> System for F {
-    fn run_system(&self, ecs: &mut ECS) {
-        todo!()
+pub struct SystemWrapper<T, F>(F, PhantomData<T>);
+
+impl<T: Component, F: Fn(Entity, &mut T)> From<F> for SystemWrapper<T, F> {
+    fn from(f: F) -> Self {
+        SystemWrapper(f, PhantomData)
+    }
+}
+
+impl<T: Component, F: Fn(Entity, &mut T) + Send + Sync> System for SystemWrapper<T, F> {
+    fn run_system(&self, SystemParam(component_containers): SystemParam<'_>) {
+        if let Some(components) = component_containers.get_mut(&TypeId::of::<T>()) {
+            components
+                .as_component_container_mut::<T>()
+                .unwrap()
+                .components
+                .par_iter_mut()
+                .enumerate()
+                .for_each(|(id, data)| {
+                    if let &mut Some((gen, ref mut component)) = data {
+                        self.0(Entity { id, gen }, component);
+                    }
+                });
+        }
     }
 }
 
@@ -99,7 +105,8 @@ pub struct ECS {
     // TODO: we are trimming the end off when removing entities, but what about trimming the front?
     entities: Vec<(bool, NonZeroUsize)>,
     next_free_entity: usize,
-    component_containers: HashMap<TypeId, Box<dyn ComponentContainerTrait>>,
+    component_containers: ComponentContainers,
+    systems: Vec<Box<dyn System>>,
 }
 
 impl ECS {
@@ -108,6 +115,7 @@ impl ECS {
             entities: Vec::new(),
             next_free_entity: 0,
             component_containers: HashMap::new(),
+            systems: Vec::new(),
         }
     }
 
@@ -250,25 +258,17 @@ impl ECS {
         })
     }
 
-    pub fn add_system<T: Component>(&mut self, system: SystemType<T>) {
-        let component_container = self
-            .component_containers
-            .entry(TypeId::of::<T>())
-            .or_insert_with(|| Box::<ComponentContainer<T>>::default());
-        component_container
-            .as_any_mut()
-            .downcast_mut::<ComponentContainer<T>>()
-            .unwrap()
-            .systems
-            .push(system);
+    pub fn add_system<T: 'static, F: 'static>(&mut self, system: impl Into<SystemWrapper<T, F>>)
+    where
+        SystemWrapper<T, F>: System,
+    {
+        self.systems.push(Box::new(system.into()));
     }
 
     pub fn run_systems(&mut self) {
-        self.component_containers
-            .par_iter_mut()
-            .for_each(|(_, component_container)| {
-                component_container.run_systems();
-            });
+        for system in &self.systems {
+            system.run_system(SystemParam(&mut self.component_containers));
+        }
     }
 }
 
