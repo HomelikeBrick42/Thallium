@@ -5,7 +5,7 @@ use std::{
     num::NonZeroUsize,
 };
 
-type SystemType<T> = Box<dyn Fn(Entity, &mut T) + Send + Sync>;
+pub type SystemType<T> = Box<dyn Fn(Entity, &mut T) + Send + Sync>;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Entity {
@@ -22,14 +22,14 @@ trait ComponentContainerTrait: Any + Send + Sync {
 }
 
 struct ComponentContainer<T: Component> {
-    components: HashMap<Entity, T>,
+    components: Vec<Option<(NonZeroUsize, T)>>,
     systems: Vec<SystemType<T>>,
 }
 
 impl<T: Component> Default for ComponentContainer<T> {
     fn default() -> Self {
         Self {
-            components: HashMap::default(),
+            components: Vec::default(),
             systems: Vec::default(),
         }
     }
@@ -48,8 +48,11 @@ impl<T: Component> ComponentContainerTrait for ComponentContainer<T> {
         self.systems.iter_mut().for_each(|system| {
             self.components
                 .par_iter_mut()
-                .for_each(|(&entity, component)| {
-                    system(entity, component);
+                .enumerate()
+                .for_each(|(id, data)| {
+                    if let &mut Some((gen, ref mut component)) = data {
+                        system(Entity { id, gen }, component);
+                    }
                 });
         });
     }
@@ -76,12 +79,51 @@ impl ECS {
         let component_container = self
             .component_containers
             .entry(TypeId::of::<T>())
-            .or_insert_with(|| Box::<ComponentContainer<T>>::default())
+            .or_insert_with(|| Box::<ComponentContainer<T>>::default());
+        let components = &mut component_container
             .as_any_mut()
             .downcast_mut::<ComponentContainer<T>>()
-            .unwrap();
-        component_container.components.insert(entity, component);
-        component_container.components.get_mut(&entity)
+            .unwrap()
+            .components;
+        if entity.id >= components.len() {
+            let count = components.len() - entity.id + 1;
+            components.reserve(count);
+            components.extend(std::iter::repeat(None).take(count));
+        }
+        if components[entity.id].is_some() {
+            return None;
+        }
+        components[entity.id] = Some((entity.gen, component));
+        Some(&mut components[entity.id].as_mut().unwrap().1)
+    }
+
+    pub fn remove_component<T: Component>(&mut self, entity: Entity) -> Option<T> {
+        if !self.is_valid(entity) {
+            return None;
+        }
+
+        let component_container = self
+            .component_containers
+            .entry(TypeId::of::<T>())
+            .or_insert_with(|| Box::<ComponentContainer<T>>::default());
+        let components = &mut component_container
+            .as_any_mut()
+            .downcast_mut::<ComponentContainer<T>>()
+            .unwrap()
+            .components;
+
+        let component = components[entity.id].take().map(|(gen, component)| {
+            assert!(entity.gen == gen);
+            component
+        });
+
+        // Free up unused space
+        while let Some(&None) = components.last() {
+            components.pop();
+        }
+        components.shrink_to_fit();
+
+        component
     }
 
     pub fn get_component<T: Component>(&self, entity: Entity) -> Option<&T> {
@@ -90,12 +132,16 @@ impl ECS {
         }
 
         let component_container = self.component_containers.get(&TypeId::of::<T>())?;
-        component_container
+        let components = &component_container
             .as_any()
             .downcast_ref::<ComponentContainer<T>>()
             .unwrap()
-            .components
-            .get(&entity)
+            .components;
+        components.get(entity.id).and_then(|data| {
+            let &(gen, ref component) = data.as_ref()?;
+            assert!(entity.gen == gen);
+            Some(component)
+        })
     }
 
     pub fn get_component_mut<T: Component>(&mut self, entity: Entity) -> Option<&mut T> {
@@ -104,12 +150,16 @@ impl ECS {
         }
 
         let component_container = self.component_containers.get_mut(&TypeId::of::<T>())?;
-        component_container
+        let components = &mut component_container
             .as_any_mut()
             .downcast_mut::<ComponentContainer<T>>()
             .unwrap()
-            .components
-            .get_mut(&entity)
+            .components;
+        components.get_mut(entity.id).and_then(|data| {
+            let &mut (gen, ref mut component) = data.as_mut()?;
+            assert!(entity.gen == gen);
+            Some(component)
+        })
     }
 
     pub fn add_system<T: Component>(&mut self, system: SystemType<T>) {
