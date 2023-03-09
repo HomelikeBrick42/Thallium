@@ -114,9 +114,11 @@ impl ECS {
             return false;
         }
 
-        for component_container in self.component_containers.values_mut() {
-            component_container.remove_entity(entity);
-        }
+        self.component_containers
+            .par_iter_mut()
+            .for_each(|(_, component_container)| {
+                component_container.remove_entity(entity);
+            });
 
         self.entities[entity.id].0 = false;
         if entity.id < self.next_free_entity {
