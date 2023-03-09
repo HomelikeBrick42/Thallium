@@ -22,6 +22,18 @@ trait ComponentContainerTrait: Any + Send + Sync {
     fn run_systems(&mut self);
 }
 
+impl dyn ComponentContainerTrait {
+    pub fn as_component_container<T: Component>(&self) -> Option<&ComponentContainer<T>> {
+        self.as_any().downcast_ref()
+    }
+
+    pub fn as_component_container_mut<T: Component>(
+        &mut self,
+    ) -> Option<&mut ComponentContainer<T>> {
+        self.as_any_mut().downcast_mut()
+    }
+}
+
 struct ComponentContainer<T: Component> {
     // TODO: we are trimming the end off when removing components, but what about trimming the front?
     components: Vec<Option<(NonZeroUsize, T)>>,
@@ -70,6 +82,16 @@ impl<T: Component> ComponentContainerTrait for ComponentContainer<T> {
             self.components.pop();
         }
         self.components.shrink_to_fit();
+    }
+}
+
+pub trait System {
+    fn run_system(&self, ecs: &mut ECS);
+}
+
+impl<T: Component, F: Fn(Entity, &mut T)> System for F {
+    fn run_system(&self, ecs: &mut ECS) {
+        todo!()
     }
 }
 
@@ -146,15 +168,14 @@ impl ECS {
             return None;
         }
 
-        let component_container = self
+        let components = &mut self
             .component_containers
             .entry(TypeId::of::<T>())
-            .or_insert_with(|| Box::<ComponentContainer<T>>::default());
-        let components = &mut component_container
-            .as_any_mut()
-            .downcast_mut::<ComponentContainer<T>>()
+            .or_insert_with(|| Box::<ComponentContainer<T>>::default())
+            .as_component_container_mut()
             .unwrap()
             .components;
+
         if entity.id >= components.len() {
             let count = components.len() - entity.id + 1;
             components.reserve(count);
@@ -172,13 +193,10 @@ impl ECS {
             return None;
         }
 
-        let component_container = self
+        let components = &mut self
             .component_containers
-            .entry(TypeId::of::<T>())
-            .or_insert_with(|| Box::<ComponentContainer<T>>::default());
-        let components = &mut component_container
-            .as_any_mut()
-            .downcast_mut::<ComponentContainer<T>>()
+            .get_mut(&TypeId::of::<T>())?
+            .as_component_container_mut()
             .unwrap()
             .components;
 
@@ -201,10 +219,10 @@ impl ECS {
             return None;
         }
 
-        let component_container = self.component_containers.get(&TypeId::of::<T>())?;
-        let components = &component_container
-            .as_any()
-            .downcast_ref::<ComponentContainer<T>>()
+        let components = &self
+            .component_containers
+            .get(&TypeId::of::<T>())?
+            .as_component_container()
             .unwrap()
             .components;
         components.get(entity.id).and_then(|data| {
@@ -219,10 +237,10 @@ impl ECS {
             return None;
         }
 
-        let component_container = self.component_containers.get_mut(&TypeId::of::<T>())?;
-        let components = &mut component_container
-            .as_any_mut()
-            .downcast_mut::<ComponentContainer<T>>()
+        let components = &mut self
+            .component_containers
+            .get_mut(&TypeId::of::<T>())?
+            .as_component_container_mut()
             .unwrap()
             .components;
         components.get_mut(entity.id).and_then(|data| {
