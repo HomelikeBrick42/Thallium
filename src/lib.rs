@@ -18,6 +18,7 @@ pub trait Component: Clone + Sized + Send + Sync + 'static {}
 trait ComponentContainerTrait: Any + Send + Sync {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
+    fn remove_entity(&mut self, entity: Entity);
     fn run_systems(&mut self);
 }
 
@@ -57,9 +58,23 @@ impl<T: Component> ComponentContainerTrait for ComponentContainer<T> {
                 });
         });
     }
+
+    fn remove_entity(&mut self, entity: Entity) {
+        if let Some((gen, _)) = self.components[entity.id] {
+            assert!(entity.gen == gen);
+            self.components[entity.id] = None;
+        }
+
+        // Free up unused components
+        while let Some(&None) = self.components.last() {
+            self.components.pop();
+        }
+        self.components.shrink_to_fit();
+    }
 }
 
 pub struct ECS {
+    // TODO: we are trimming the end off when removing entities, but what about trimming the front?
     entities: Vec<(bool, NonZeroUsize)>,
     next_free_entity: usize,
     component_containers: HashMap<TypeId, Box<dyn ComponentContainerTrait>>,
@@ -97,6 +112,10 @@ impl ECS {
     pub fn destroy_entity(&mut self, entity: Entity) -> bool {
         if !self.is_entity_valid(entity) {
             return false;
+        }
+
+        for component_container in self.component_containers.values_mut() {
+            component_container.remove_entity(entity);
         }
 
         self.entities[entity.id].0 = false;
@@ -166,7 +185,7 @@ impl ECS {
             component
         });
 
-        // Free up unused space
+        // Free up unused components
         while let Some(&None) = components.last() {
             components.pop();
         }
