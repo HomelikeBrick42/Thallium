@@ -77,7 +77,10 @@ pub trait System {
 
 pub struct SystemWrapper<T, F>(F, PhantomData<T>);
 
-impl<T: Component, F: Fn(Entity, &mut T)> From<F> for SystemWrapper<T, F> {
+impl<T, F> From<F> for SystemWrapper<T, F>
+where
+    SystemWrapper<T, F>: System,
+{
     fn from(f: F) -> Self {
         SystemWrapper(f, PhantomData)
     }
