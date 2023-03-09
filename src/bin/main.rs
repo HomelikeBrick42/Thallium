@@ -1,6 +1,5 @@
 use thallium_ecs::*;
 
-#[derive(Clone)]
 struct TestComponent {
     value: i32,
 }

@@ -12,7 +12,7 @@ pub struct Entity {
     gen: std::num::NonZeroUsize,
 }
 
-pub trait Component: Clone + Sized + Send + Sync + 'static {}
+pub trait Component: Sized + Send + Sync + 'static {}
 
 trait ComponentContainerTrait: Any + Send + Sync {
     fn as_any(&self) -> &dyn Any;
@@ -187,7 +187,7 @@ impl ECS {
         if entity.id >= components.len() {
             let count = components.len() - entity.id + 1;
             components.reserve(count);
-            components.extend(std::iter::repeat(None).take(count));
+            components.extend(std::iter::repeat_with(|| None).take(count));
         }
         if components[entity.id].is_some() {
             return None;
