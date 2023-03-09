@@ -233,14 +233,16 @@ impl ECS {
     }
 
     pub fn add_system<T: Component>(&mut self, system: SystemType<T>) {
-        let component_container = (&mut *self
+        let component_container = self
             .component_containers
             .entry(TypeId::of::<T>())
-            .or_insert_with(|| Box::<ComponentContainer<T>>::default())
-            as &mut dyn Any)
+            .or_insert_with(|| Box::<ComponentContainer<T>>::default());
+        component_container
+            .as_any_mut()
             .downcast_mut::<ComponentContainer<T>>()
-            .unwrap();
-        component_container.systems.push(system);
+            .unwrap()
+            .systems
+            .push(system);
     }
 
     pub fn run_systems(&mut self) {
