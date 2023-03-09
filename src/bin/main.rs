@@ -8,7 +8,7 @@ impl Component for TestComponent {}
 
 fn main() {
     let mut ecs = ECS::new();
-    ecs.add_system(|_entity: Entity, test_component: &mut TestComponent| {
+    ecs.register_system(|_entity: Entity, test_component: &mut TestComponent| {
         println!("{}", test_component.value);
         test_component.value += 1;
     });
@@ -19,9 +19,9 @@ fn main() {
     let b = ecs.create_entity();
     ecs.add_component(b, TestComponent { value: -42 });
 
-    ecs.run_systems();
+    ecs.run_registered_systems();
     println!();
-    ecs.run_systems();
+    ecs.run_registered_systems();
     println!();
-    ecs.run_systems();
+    ecs.run_registered_systems();
 }

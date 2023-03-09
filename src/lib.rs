@@ -14,7 +14,7 @@ pub struct Entity {
 
 pub trait Component: Sized + Send + Sync + 'static {}
 
-trait ComponentContainerTrait: Any + Send + Sync {
+trait ComponentContainerTrait: Send + Sync {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
     fn remove_entity(&mut self, entity: Entity);
@@ -258,14 +258,25 @@ impl ECS {
         })
     }
 
-    pub fn add_system<T: 'static, F: 'static>(&mut self, system: impl Into<SystemWrapper<T, F>>)
-    where
+    pub fn register_system<T: 'static, F: 'static>(
+        &mut self,
+        system: impl Into<SystemWrapper<T, F>>,
+    ) where
         SystemWrapper<T, F>: System,
     {
         self.systems.push(Box::new(system.into()));
     }
 
-    pub fn run_systems(&mut self) {
+    pub fn run_system<T: 'static, F: 'static>(&mut self, system: impl Into<SystemWrapper<T, F>>)
+    where
+        SystemWrapper<T, F>: System,
+    {
+        system
+            .into()
+            .run_system(SystemParam(&mut self.component_containers));
+    }
+
+    pub fn run_registered_systems(&mut self) {
         for system in &self.systems {
             system.run_system(SystemParam(&mut self.component_containers));
         }
