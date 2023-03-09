@@ -22,6 +22,7 @@ trait ComponentContainerTrait: Any + Send + Sync {
 }
 
 struct ComponentContainer<T: Component> {
+    // TODO: we are trimming the end off when removing components, but what about trimming the front?
     components: Vec<Option<(NonZeroUsize, T)>>,
     systems: Vec<SystemType<T>>,
 }
@@ -59,20 +60,68 @@ impl<T: Component> ComponentContainerTrait for ComponentContainer<T> {
 }
 
 pub struct ECS {
-    entities: HashMap<usize, NonZeroUsize>,
+    entities: Vec<(bool, NonZeroUsize)>,
+    next_free_entity: usize,
     component_containers: HashMap<TypeId, Box<dyn ComponentContainerTrait>>,
 }
 
 impl ECS {
-    pub fn is_valid(&self, entity: Entity) -> bool {
+    pub fn new() -> Self {
+        Self {
+            entities: Vec::new(),
+            next_free_entity: 0,
+            component_containers: HashMap::new(),
+        }
+    }
+
+    pub fn create_entity(&mut self) -> Entity {
+        while self.next_free_entity < self.entities.len() {
+            let (alive, gen) = &mut self.entities[self.next_free_entity];
+            if !*alive {
+                *alive = true;
+                *gen = gen.checked_add(1).unwrap();
+                return Entity {
+                    id: self.next_free_entity,
+                    gen: *gen,
+                };
+            }
+            self.next_free_entity += 1;
+        }
+
+        let id = self.entities.len();
+        let gen = NonZeroUsize::new(1).unwrap();
+        self.entities.push((true, gen));
+        Entity { id, gen }
+    }
+
+    pub fn destroy_entity(&mut self, entity: Entity) -> bool {
+        if !self.is_entity_valid(entity) {
+            return false;
+        }
+
+        self.entities[entity.id].0 = false;
+        if entity.id < self.next_free_entity {
+            self.next_free_entity = entity.id;
+        }
+
+        // Free up unused entities
+        while let Some(&(false, _)) = self.entities.last() {
+            self.entities.pop();
+        }
+        self.entities.shrink_to_fit();
+
+        true
+    }
+
+    pub fn is_entity_valid(&self, entity: Entity) -> bool {
         self.entities
-            .get(&entity.id)
-            .map(|gen| &entity.gen == gen)
+            .get(entity.id)
+            .map(|&(alive, gen)| alive && entity.gen == gen)
             .unwrap_or(false)
     }
 
     pub fn add_component<T: Component>(&mut self, entity: Entity, component: T) -> Option<&mut T> {
-        if !self.is_valid(entity) {
+        if !self.is_entity_valid(entity) {
             return None;
         }
 
@@ -98,7 +147,7 @@ impl ECS {
     }
 
     pub fn remove_component<T: Component>(&mut self, entity: Entity) -> Option<T> {
-        if !self.is_valid(entity) {
+        if !self.is_entity_valid(entity) {
             return None;
         }
 
@@ -127,7 +176,7 @@ impl ECS {
     }
 
     pub fn get_component<T: Component>(&self, entity: Entity) -> Option<&T> {
-        if !self.is_valid(entity) {
+        if !self.is_entity_valid(entity) {
             return None;
         }
 
@@ -145,7 +194,7 @@ impl ECS {
     }
 
     pub fn get_component_mut<T: Component>(&mut self, entity: Entity) -> Option<&mut T> {
-        if !self.is_valid(entity) {
+        if !self.is_entity_valid(entity) {
             return None;
         }
 
@@ -179,5 +228,11 @@ impl ECS {
             .for_each(|(_, component_container)| {
                 component_container.run_systems();
             });
+    }
+}
+
+impl Default for ECS {
+    fn default() -> Self {
+        Self::new()
     }
 }
