@@ -1,7 +1,7 @@
+use hashbrown::HashMap;
 use rayon::prelude::*;
 use std::{
     any::{Any, TypeId},
-    collections::HashMap,
     marker::PhantomData,
     num::NonZeroUsize,
 };
@@ -69,7 +69,9 @@ impl<T: Component> ComponentContainerTrait for ComponentContainer<T> {
 }
 
 type ComponentContainers = HashMap<TypeId, Box<dyn ComponentContainerTrait>>;
-pub struct SystemParam<'a>(&'a mut ComponentContainers);
+pub struct SystemParam<'a> {
+    component_containers: &'a mut ComponentContainers,
+}
 
 pub trait System {
     fn run_system(&self, ecs: SystemParam<'_>);
@@ -87,20 +89,72 @@ where
 }
 
 impl<T: Component, F: Fn(Entity, &mut T) + Send + Sync> System for SystemWrapper<T, F> {
-    fn run_system(&self, SystemParam(component_containers): SystemParam<'_>) {
-        if let Some(components) = component_containers.get_mut(&TypeId::of::<T>()) {
-            components
-                .as_component_container_mut::<T>()
-                .unwrap()
-                .components
-                .par_iter_mut()
-                .enumerate()
-                .for_each(|(id, data)| {
-                    if let &mut Some((gen, ref mut component)) = data {
-                        self.0(Entity { id, gen }, component);
-                    }
-                });
-        }
+    fn run_system(
+        &self,
+        SystemParam {
+            component_containers,
+            ..
+        }: SystemParam<'_>,
+    ) {
+        let Some(components) = component_containers.get_mut(&TypeId::of::<T>()) else { return; };
+        components
+            .as_component_container_mut::<T>()
+            .unwrap()
+            .components
+            .par_iter_mut()
+            .enumerate()
+            .for_each(|(id, data)| {
+                if let &mut Some((gen, ref mut component)) = data {
+                    self.0(Entity { id, gen }, component);
+                }
+            });
+    }
+}
+
+impl<T: Component, U: Component, F: Fn(Entity, &mut T, &mut U) + Send + Sync> System
+    for SystemWrapper<(T, U), F>
+{
+    fn run_system(
+        &self,
+        SystemParam {
+            component_containers,
+            ..
+        }: SystemParam<'_>,
+    ) {
+        let type_ids = [&TypeId::of::<T>(), &TypeId::of::<U>()];
+
+        // make sure there are no duplicates
+        assert!(!type_ids
+            .iter()
+            .enumerate()
+            .any(|(i, a)| type_ids.iter().enumerate().any(|(j, b)| i != j && a == b)));
+
+        let Some([t_components, u_components]) =
+            component_containers.get_many_mut(type_ids) else { return; };
+
+        t_components
+            .as_component_container_mut::<T>()
+            .unwrap()
+            .components
+            .par_iter_mut()
+            .zip(
+                u_components
+                    .as_component_container_mut::<U>()
+                    .unwrap()
+                    .components
+                    .par_iter_mut(),
+            )
+            .enumerate()
+            .for_each(|(id, (t_component, u_component))| {
+                if let (
+                    &mut Some((t_gen, ref mut t_component)),
+                    &mut Some((u_gen, ref mut u_component)),
+                ) = (t_component, u_component)
+                {
+                    assert_eq!(t_gen, u_gen);
+                    self.0(Entity { id, gen: t_gen }, t_component, u_component);
+                }
+            });
     }
 }
 
@@ -188,7 +242,7 @@ impl ECS {
             .components;
 
         if entity.id >= components.len() {
-            let count = components.len() - entity.id + 1;
+            let count = entity.id - components.len() + 1;
             components.reserve(count);
             components.extend(std::iter::repeat_with(|| None).take(count));
         }
@@ -274,14 +328,16 @@ impl ECS {
     where
         SystemWrapper<T, F>: System,
     {
-        system
-            .into()
-            .run_system(SystemParam(&mut self.component_containers));
+        system.into().run_system(SystemParam {
+            component_containers: &mut self.component_containers,
+        });
     }
 
     pub fn run_registered_systems(&mut self) {
         for system in &self.systems {
-            system.run_system(SystemParam(&mut self.component_containers));
+            system.run_system(SystemParam {
+                component_containers: &mut self.component_containers,
+            });
         }
     }
 }
