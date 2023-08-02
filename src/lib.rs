@@ -1,7 +1,8 @@
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use rayon::prelude::*;
 use std::{
     any::{Any, TypeId},
+    cell::UnsafeCell,
     marker::PhantomData,
     num::NonZeroUsize,
 };
@@ -68,99 +69,190 @@ impl<T: Component> ComponentContainerTrait for ComponentContainer<T> {
     }
 }
 
-type ComponentContainers = HashMap<TypeId, Box<dyn ComponentContainerTrait>>;
+struct ComponentContainers {
+    containers: HashMap<TypeId, Box<UnsafeCell<dyn ComponentContainerTrait>>>,
+}
+unsafe impl Sync for ComponentContainers {}
+
+type Entities = Vec<(bool, NonZeroUsize)>;
 pub struct SystemParam<'a> {
-    component_containers: &'a mut ComponentContainers,
+    component_containers: &'a ComponentContainers,
+    entities: &'a Entities,
+}
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub enum Mutability {
+    Unique,
+    Shared,
 }
 
 pub trait System {
+    fn get_type_ids(&self, ids: &mut Vec<(TypeId, Mutability)>);
     fn run_system(&self, ecs: SystemParam<'_>);
 }
 
-pub struct SystemWrapper<T, F>(F, PhantomData<T>);
+/// # Safety
+/// no safety docs yet
+unsafe trait SystemParameter: Sync + Sized {
+    fn get_type_ids(ids: &mut Vec<(TypeId, Mutability)>);
+    unsafe fn from_system_param<'a>(entity: Entity, ecs: &'a SystemParam<'a>) -> Option<Self>
+    where
+        Self: 'a;
+}
 
-impl<T, F> From<F> for SystemWrapper<T, F>
+macro_rules! define_system_parameter {
+    ($($generic:ident),*) => {
+        unsafe impl<$($generic,)*> SystemParameter for ($($generic,)*)
+        where
+            $($generic: SystemParameter,)*
+        {
+            fn get_type_ids(ids: &mut Vec<(TypeId, Mutability)>) {
+                let _ = ids;
+                $($generic::get_type_ids(ids);)*
+            }
+
+            unsafe fn from_system_param<'a>(
+                entity: Entity,
+                ecs: &'a SystemParam<'a>,
+            ) -> Option<Self>
+            where
+                Self: 'a,
+            {
+                let _ = entity;
+                let _ = ecs;
+                Some(($($generic::from_system_param(entity, ecs)?,)*))
+            }
+        }
+    };
+}
+
+define_system_parameter!();
+define_system_parameter!(A);
+define_system_parameter!(A, B);
+define_system_parameter!(A, B, C);
+define_system_parameter!(A, B, C, D);
+define_system_parameter!(A, B, C, D, E);
+define_system_parameter!(A, B, C, D, E, F);
+define_system_parameter!(A, B, C, D, E, F, G);
+define_system_parameter!(A, B, C, D, E, F, G, H);
+define_system_parameter!(A, B, C, D, E, F, G, H, I);
+define_system_parameter!(A, B, C, D, E, F, G, H, I, J);
+
+unsafe impl<'a, T> SystemParameter for &'a mut T
 where
-    SystemWrapper<T, F>: System,
+    T: Component,
+{
+    fn get_type_ids(ids: &mut Vec<(TypeId, Mutability)>) {
+        ids.push((TypeId::of::<T>(), Mutability::Unique));
+    }
+
+    unsafe fn from_system_param<'b>(entity: Entity, ecs: &'b SystemParam<'b>) -> Option<Self>
+    where
+        'a: 'b,
+    {
+        let components = &mut (*ecs
+            .component_containers
+            .containers
+            .get(&TypeId::of::<T>())?
+            .get())
+        .as_component_container_mut()
+        .unwrap()
+        .components;
+        components.get_mut(entity.id).and_then(|data| {
+            let &mut (gen, ref mut component) = data.as_mut()?;
+            assert!(entity.gen == gen);
+            Some(component)
+        })
+    }
+}
+
+unsafe impl<'a, T> SystemParameter for &'a T
+where
+    T: Component,
+{
+    fn get_type_ids(ids: &mut Vec<(TypeId, Mutability)>) {
+        ids.push((TypeId::of::<T>(), Mutability::Unique));
+    }
+
+    unsafe fn from_system_param<'b>(entity: Entity, ecs: &'b SystemParam<'b>) -> Option<Self>
+    where
+        'a: 'b,
+    {
+        let components = &(*ecs
+            .component_containers
+            .containers
+            .get(&TypeId::of::<T>())?
+            .get())
+        .as_component_container()
+        .unwrap()
+        .components;
+        components.get(entity.id).and_then(|data| {
+            let &(gen, ref component) = data.as_ref()?;
+            assert!(entity.gen == gen);
+            Some(component)
+        })
+    }
+}
+
+pub struct SystemWrapper<Args, F>(F, PhantomData<Args>);
+impl<Args, F> From<F> for SystemWrapper<Args, F>
+where
+    Self: System,
 {
     fn from(f: F) -> Self {
         SystemWrapper(f, PhantomData)
     }
 }
 
-impl<T: Component, F: Fn(Entity, &mut T) + Send + Sync> System for SystemWrapper<T, F> {
-    fn run_system(
-        &self,
-        SystemParam {
-            component_containers,
-            ..
-        }: SystemParam<'_>,
-    ) {
-        let Some(components) = component_containers.get_mut(&TypeId::of::<T>()) else { return; };
-        components
-            .as_component_container_mut::<T>()
-            .unwrap()
-            .components
-            .par_iter_mut()
-            .enumerate()
-            .for_each(|(id, data)| {
-                if let &mut Some((gen, ref mut component)) = data {
-                    self.0(Entity { id, gen }, component);
-                }
-            });
-    }
+macro_rules! define_system {
+    ($($generic:ident),*) => {
+        impl<$($generic,)* Func> System for SystemWrapper<($($generic,)*), Func>
+        where
+            $($generic: SystemParameter,)*
+            Func: Fn(Entity, $($generic,)*) + Sync,
+        {
+            fn get_type_ids(&self, ids: &mut Vec<(TypeId, Mutability)>) {
+                let _ = ids;
+                $($generic::get_type_ids(ids);)*
+            }
+
+            fn run_system(&self, ecs: SystemParam<'_>) {
+                ecs.entities
+                    .par_iter()
+                    .enumerate()
+                    .for_each(|(id, &(alive, gen))| {
+                        if !alive {
+                            return;
+                        }
+                        let entity = Entity { id, gen };
+                        $(
+                            #[allow(non_snake_case)]
+                            let Some($generic) = (unsafe { $generic::from_system_param(entity, &ecs) }) else {
+                                return;
+                            };
+                        )*
+                        self.0(entity, $($generic,)*);
+                    });
+            }
+        }
+    };
 }
 
-impl<T: Component, U: Component, F: Fn(Entity, &mut T, &mut U) + Send + Sync> System
-    for SystemWrapper<(T, U), F>
-{
-    fn run_system(
-        &self,
-        SystemParam {
-            component_containers,
-            ..
-        }: SystemParam<'_>,
-    ) {
-        let type_ids = [&TypeId::of::<T>(), &TypeId::of::<U>()];
-
-        // make sure there are no duplicates
-        assert!(!type_ids
-            .iter()
-            .enumerate()
-            .any(|(i, a)| type_ids.iter().enumerate().any(|(j, b)| i != j && a == b)));
-
-        let Some([t_components, u_components]) =
-            component_containers.get_many_mut(type_ids) else { return; };
-
-        t_components
-            .as_component_container_mut::<T>()
-            .unwrap()
-            .components
-            .par_iter_mut()
-            .zip(
-                u_components
-                    .as_component_container_mut::<U>()
-                    .unwrap()
-                    .components
-                    .par_iter_mut(),
-            )
-            .enumerate()
-            .for_each(|(id, (t_component, u_component))| {
-                if let (
-                    &mut Some((t_gen, ref mut t_component)),
-                    &mut Some((u_gen, ref mut u_component)),
-                ) = (t_component, u_component)
-                {
-                    assert_eq!(t_gen, u_gen);
-                    self.0(Entity { id, gen: t_gen }, t_component, u_component);
-                }
-            });
-    }
-}
+define_system!();
+define_system!(A);
+define_system!(A, B);
+define_system!(A, B, C);
+define_system!(A, B, C, D);
+define_system!(A, B, C, D, E);
+define_system!(A, B, C, D, E, F);
+define_system!(A, B, C, D, E, F, G);
+define_system!(A, B, C, D, E, F, G, H);
+define_system!(A, B, C, D, E, F, G, H, I);
+define_system!(A, B, C, D, E, F, G, H, I, J);
 
 pub struct ECS {
     // TODO: we are trimming the end off when removing entities, but what about trimming the front?
-    entities: Vec<(bool, NonZeroUsize)>,
+    entities: Entities,
     next_free_entity: usize,
     component_containers: ComponentContainers,
     systems: Vec<Box<dyn System>>,
@@ -171,7 +263,9 @@ impl ECS {
         Self {
             entities: Vec::new(),
             next_free_entity: 0,
-            component_containers: HashMap::new(),
+            component_containers: ComponentContainers {
+                containers: HashMap::new(),
+            },
             systems: Vec::new(),
         }
     }
@@ -202,9 +296,10 @@ impl ECS {
         }
 
         self.component_containers
+            .containers
             .par_iter_mut()
             .for_each(|(_, component_container)| {
-                component_container.remove_entity(entity);
+                component_container.get_mut().remove_entity(entity);
             });
 
         self.entities[entity.id].0 = false;
@@ -235,8 +330,10 @@ impl ECS {
 
         let components = &mut self
             .component_containers
+            .containers
             .entry(TypeId::of::<T>())
-            .or_insert_with(|| Box::<ComponentContainer<T>>::default())
+            .or_insert_with(|| Box::<UnsafeCell<ComponentContainer<T>>>::default())
+            .get_mut()
             .as_component_container_mut()
             .unwrap()
             .components;
@@ -260,7 +357,9 @@ impl ECS {
 
         let components = &mut self
             .component_containers
+            .containers
             .get_mut(&TypeId::of::<T>())?
+            .get_mut()
             .as_component_container_mut()
             .unwrap()
             .components;
@@ -286,10 +385,15 @@ impl ECS {
 
         let components = &self
             .component_containers
-            .get(&TypeId::of::<T>())?
-            .as_component_container()
-            .unwrap()
-            .components;
+            .containers
+            .get(&TypeId::of::<T>())?;
+        // safe, all the methods that modify components take &mut self
+        let components = unsafe {
+            &(*components.get())
+                .as_component_container()
+                .unwrap()
+                .components
+        };
         components.get(entity.id).and_then(|data| {
             let &(gen, ref component) = data.as_ref()?;
             assert!(entity.gen == gen);
@@ -304,7 +408,9 @@ impl ECS {
 
         let components = &mut self
             .component_containers
+            .containers
             .get_mut(&TypeId::of::<T>())?
+            .get_mut()
             .as_component_container_mut()
             .unwrap()
             .components;
@@ -321,24 +427,46 @@ impl ECS {
     ) where
         SystemWrapper<T, F>: System,
     {
-        self.systems.push(Box::new(system.into()));
+        let system = system.into();
+        let mut types = vec![];
+        system.get_type_ids(&mut types);
+        assert!(Self::is_system_parameter_types_valid(&types));
+        self.systems.push(Box::new(system));
     }
 
     pub fn run_system<T: 'static, F: 'static>(&mut self, system: impl Into<SystemWrapper<T, F>>)
     where
         SystemWrapper<T, F>: System,
     {
-        system.into().run_system(SystemParam {
-            component_containers: &mut self.component_containers,
+        let system = system.into();
+        let mut types = vec![];
+        system.get_type_ids(&mut types);
+        assert!(Self::is_system_parameter_types_valid(&types));
+        system.run_system(SystemParam {
+            component_containers: &self.component_containers,
+            entities: &self.entities,
         });
     }
 
     pub fn run_registered_systems(&mut self) {
         for system in &self.systems {
             system.run_system(SystemParam {
-                component_containers: &mut self.component_containers,
+                component_containers: &self.component_containers,
+                entities: &self.entities,
             });
         }
+    }
+
+    fn is_system_parameter_types_valid(types: &[(TypeId, Mutability)]) -> bool {
+        let mut set = HashSet::new();
+        for &(typ, mutability) in types {
+            if !set.insert(typ) {
+                if let Mutability::Unique = mutability {
+                    return false;
+                }
+            }
+        }
+        true
     }
 }
 
