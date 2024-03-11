@@ -6,7 +6,7 @@ use parking_lot::{
 
 use crate::{
     query::{Component, ComponentContainerTrait, Ref, RefMut},
-    system::{ComponentContainer, RunState},
+    system::{BorrowType, ComponentContainer, RunState},
 };
 
 pub trait QueryParameter {
@@ -17,6 +17,7 @@ pub trait QueryParameter {
     fn construct<'a>(
         lock: &'a mut Self::ComponentContainerLock<'_>,
     ) -> Self::ComponentContainer<'a>;
+    fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)>;
 }
 
 impl<C> QueryParameter for Ref<C>
@@ -42,6 +43,10 @@ where
     ) -> Self::ComponentContainer<'a> {
         Some(lock.as_mut()?)
     }
+
+    fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+        std::iter::once((TypeId::of::<C>(), BorrowType::Immutable))
+    }
 }
 
 impl<C> QueryParameter for RefMut<C>
@@ -66,5 +71,9 @@ where
         lock: &'a mut Self::ComponentContainerLock<'_>,
     ) -> Self::ComponentContainer<'a> {
         Some(lock.as_mut()?)
+    }
+
+    fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+        std::iter::once((TypeId::of::<C>(), BorrowType::Mutable))
     }
 }

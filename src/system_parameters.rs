@@ -1,6 +1,6 @@
 use crate::{
     resource::{Res, ResMut, Resource},
-    system::RunState,
+    system::{BorrowType, RunState},
 };
 use parking_lot::{
     MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLockReadGuard, RwLockWriteGuard,
@@ -13,6 +13,8 @@ pub trait SystemParameter: Send + Sync {
 
     fn lock(state: RunState<'_>) -> Self::Lock<'_>;
     fn construct<'this>(state: &'this mut Self::Lock<'_>) -> Self::This<'this>;
+    fn get_resource_types() -> impl Iterator<Item = (TypeId, BorrowType)>;
+    fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)>;
 }
 
 impl<'a, R> SystemParameter for Res<'a, R>
@@ -37,6 +39,14 @@ where
     fn construct<'this>(state: &'this mut Self::Lock<'_>) -> Self::This<'this> {
         Res { inner: state }
     }
+
+    fn get_resource_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+        std::iter::once((TypeId::of::<R>(), BorrowType::Immutable))
+    }
+
+    fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+        std::iter::empty()
+    }
 }
 
 impl<'a, R> SystemParameter for ResMut<'a, R>
@@ -60,6 +70,14 @@ where
 
     fn construct<'this>(state: &'this mut Self::Lock<'_>) -> Self::This<'this> {
         ResMut { inner: state }
+    }
+
+    fn get_resource_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+        std::iter::once((TypeId::of::<R>(), BorrowType::Mutable))
+    }
+
+    fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+        std::iter::empty()
     }
 }
 
@@ -86,6 +104,14 @@ where
             inner: state.as_ref()?,
         })
     }
+
+    fn get_resource_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+        std::iter::once((TypeId::of::<R>(), BorrowType::Immutable))
+    }
+
+    fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+        std::iter::empty()
+    }
 }
 
 impl<'a, R> SystemParameter for Option<ResMut<'a, R>>
@@ -111,6 +137,14 @@ where
             inner: state.as_mut()?,
         })
     }
+
+    fn get_resource_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+        std::iter::once((TypeId::of::<R>(), BorrowType::Mutable))
+    }
+
+    fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+        std::iter::empty()
+    }
 }
 
 macro_rules! system_parameter_tuple {
@@ -133,6 +167,20 @@ macro_rules! system_parameter_tuple {
                 #[allow(non_snake_case)]
                 let ($($param,)*) = state;
                 ($($param::construct($param),)*)
+            }
+
+            fn get_resource_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+                std::iter::empty()
+                    $(
+                        .chain($param::get_resource_types())
+                    )*
+            }
+
+            fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+                std::iter::empty()
+                    $(
+                        .chain($param::get_component_types())
+                    )*
             }
         }
     };

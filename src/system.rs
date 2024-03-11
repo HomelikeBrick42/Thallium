@@ -17,8 +17,15 @@ pub struct RunState<'a> {
     pub(crate) components: &'a ComponentMap,
 }
 
+pub enum BorrowType {
+    Immutable,
+    Mutable,
+}
+
 pub trait System: Send + Sync + 'static {
     fn run(&mut self, state: RunState<'_>);
+    fn get_resource_types(&self) -> Vec<(TypeId, BorrowType)>;
+    fn get_component_types(&self) -> Vec<(TypeId, BorrowType)>;
 }
 
 pub struct SystemWrapper<F, Marker>(pub(crate) F, pub(crate) PhantomData<fn(Marker)>);
@@ -30,10 +37,20 @@ where
     fn run(&mut self, state: RunState<'_>) {
         SystemFunction::run(&mut self.0, state);
     }
+
+    fn get_resource_types(&self) -> Vec<(TypeId, BorrowType)> {
+        F::get_resource_types().collect()
+    }
+
+    fn get_component_types(&self) -> Vec<(TypeId, BorrowType)> {
+        F::get_component_types().collect()
+    }
 }
 
 pub trait SystemFunction<Marker>: Send + Sync + 'static {
     fn run(&mut self, state: RunState<'_>);
+    fn get_resource_types() -> impl Iterator<Item = (TypeId, BorrowType)>;
+    fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)>;
 }
 
 macro_rules! system_function_impl {
@@ -50,6 +67,20 @@ macro_rules! system_function_impl {
                     let mut $param = $param::lock(state);
                 )*
                 self($($param::construct(&mut $param)),*)
+            }
+
+            fn get_resource_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+                std::iter::empty()
+                    $(
+                        .chain($param::get_resource_types())
+                    )*
+            }
+
+            fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+                std::iter::empty()
+                    $(
+                        .chain($param::get_component_types())
+                    )*
             }
         }
     };

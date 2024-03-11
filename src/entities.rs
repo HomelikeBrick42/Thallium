@@ -1,4 +1,9 @@
-use crate::{system::RunState, system_parameters::SystemParameter};
+use std::any::TypeId;
+
+use crate::{
+    system::{BorrowType, RunState},
+    system_parameters::SystemParameter,
+};
 use slotmap::SlotMap;
 
 slotmap::new_key_type! {
@@ -26,5 +31,13 @@ impl<'a> SystemParameter for Entities<'a> {
 
     fn construct<'this>(state: &'this mut Self::Lock<'_>) -> Self::This<'this> {
         Entities { entities: state }
+    }
+
+    fn get_resource_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+        std::iter::empty()
+    }
+
+    fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+        std::iter::empty()
     }
 }

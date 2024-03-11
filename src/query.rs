@@ -1,8 +1,11 @@
 use crate::{
-    entities::Entity, query_parameters::QueryParameter, system::RunState, system_parameters::SystemParameter
+    entities::Entity,
+    query_parameters::QueryParameter,
+    system::{BorrowType, RunState},
+    system_parameters::SystemParameter,
 };
 use slotmap::{SecondaryMap, SlotMap};
-use std::marker::PhantomData;
+use std::{any::TypeId, marker::PhantomData};
 
 pub trait Component: Sized + Send + Sync + 'static {}
 
@@ -42,6 +45,14 @@ where
             entities,
             container: Q::construct(state),
         }
+    }
+
+    fn get_resource_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+        std::iter::empty()
+    }
+
+    fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+        Q::get_component_types()
     }
 }
 
