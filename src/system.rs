@@ -31,8 +31,6 @@ pub struct Borrow {
 
 pub trait System: Send + Sync + 'static {
     fn run(&mut self, state: RunState<'_>);
-    fn get_resource_types(&self) -> Vec<Borrow>;
-    fn get_component_types(&self) -> Vec<Borrow>;
 }
 
 pub struct SystemWrapper<F, Marker>(pub(crate) F, pub(crate) PhantomData<fn(Marker)>);
@@ -43,14 +41,6 @@ where
 {
     fn run(&mut self, state: RunState<'_>) {
         SystemFunction::run(&mut self.0, state);
-    }
-
-    fn get_resource_types(&self) -> Vec<Borrow> {
-        F::get_resource_types().collect()
-    }
-
-    fn get_component_types(&self) -> Vec<Borrow> {
-        F::get_component_types().collect()
     }
 }
 
