@@ -2,7 +2,10 @@ use crate::{
     entities::Entity,
     query::Component,
     resource::Resource,
-    system::{ComponentContainer, ComponentMap, ResourceMap, RunState, System, SystemWrapper},
+    system::{
+        Borrow, BorrowType, ComponentContainer, ComponentMap, ResourceMap, RunState, System,
+        SystemFunction, SystemWrapper,
+    },
 };
 use hashbrown::HashMap;
 use parking_lot::RwLock;
@@ -87,7 +90,9 @@ impl App {
     pub fn register_system<S, Marker>(&mut self, system: S)
     where
         SystemWrapper<S, Marker>: System,
+        S: SystemFunction<Marker>,
     {
+        Self::check_system::<S, Marker>();
         self.systems
             .push(Box::new(SystemWrapper(system, PhantomData)));
     }
@@ -95,7 +100,9 @@ impl App {
     pub fn run_once<S, Marker>(&mut self, system: S)
     where
         SystemWrapper<S, Marker>: System,
+        S: SystemFunction<Marker>,
     {
+        Self::check_system::<S, Marker>();
         SystemWrapper(system, PhantomData).run(RunState {
             resources: &self.resources,
             entities: &self.entities,
@@ -111,6 +118,53 @@ impl App {
                 components: &self.components,
             });
         }
+    }
+
+    fn check_system<S, Marker>() -> (HashMap<TypeId, BorrowType>, HashMap<TypeId, BorrowType>)
+    where
+        S: SystemFunction<Marker>,
+    {
+        let mut seen_resource_types: HashMap<TypeId, BorrowType> = HashMap::new();
+        for Borrow {
+            id,
+            name,
+            borrow_type,
+        } in S::get_resource_types()
+        {
+            if let Some(old_borrow_type) = seen_resource_types.insert(id, borrow_type) {
+                match (old_borrow_type, borrow_type) {
+                    (BorrowType::Mutable, _) => {
+                        panic!("tried to borrow resource `{name}`, but it has already been mutably borrowed")
+                    }
+                    (_, BorrowType::Mutable) => {
+                        panic!("tried to borrow resource `{name}` as mutable, but it has already been borrowed")
+                    }
+                    (_, _) => {}
+                }
+            }
+        }
+
+        let mut seen_component_types: HashMap<TypeId, BorrowType> = HashMap::new();
+        for Borrow {
+            id,
+            name,
+            borrow_type,
+        } in S::get_component_types()
+        {
+            if let Some(old_borrow_type) = seen_component_types.insert(id, borrow_type) {
+                match (old_borrow_type, borrow_type) {
+                    (BorrowType::Mutable, _) => {
+                        panic!("tried to borrow component `{name}`, but it has already been mutably borrowed")
+                    }
+                    (_, BorrowType::Mutable) => {
+                        panic!("tried to borrow component `{name}` as mutable, but it has already been borrowed")
+                    }
+                    (_, _) => {}
+                }
+            }
+        }
+
+        (seen_resource_types, seen_component_types)
     }
 }
 

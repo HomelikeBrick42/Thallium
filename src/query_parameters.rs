@@ -6,7 +6,7 @@ use parking_lot::{
 
 use crate::{
     query::{Component, ComponentContainerTrait, Ref, RefMut},
-    system::{BorrowType, ComponentContainer, RunState},
+    system::{Borrow, BorrowType, ComponentContainer, RunState},
 };
 
 pub trait QueryParameter {
@@ -17,7 +17,7 @@ pub trait QueryParameter {
     fn construct<'a>(
         lock: &'a mut Self::ComponentContainerLock<'_>,
     ) -> Self::ComponentContainer<'a>;
-    fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)>;
+    fn get_component_types() -> impl Iterator<Item = Borrow>;
 }
 
 impl<C> QueryParameter for Ref<C>
@@ -44,8 +44,12 @@ where
         Some(lock.as_mut()?)
     }
 
-    fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
-        std::iter::once((TypeId::of::<C>(), BorrowType::Immutable))
+    fn get_component_types() -> impl Iterator<Item = Borrow> {
+        std::iter::once(Borrow {
+            id: TypeId::of::<C>(),
+            name: std::any::type_name::<C>(),
+            borrow_type: BorrowType::Immutable,
+        })
     }
 }
 
@@ -73,8 +77,12 @@ where
         Some(lock.as_mut()?)
     }
 
-    fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
-        std::iter::once((TypeId::of::<C>(), BorrowType::Mutable))
+    fn get_component_types() -> impl Iterator<Item = Borrow> {
+        std::iter::once(Borrow {
+            id: TypeId::of::<C>(),
+            name: std::any::type_name::<C>(),
+            borrow_type: BorrowType::Mutable,
+        })
     }
 }
 
@@ -97,7 +105,7 @@ where
         OptionalComponentContainer(P::construct(lock))
     }
 
-    fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+    fn get_component_types() -> impl Iterator<Item = Borrow> {
         P::get_component_types()
     }
 }
@@ -124,7 +132,7 @@ macro_rules! query_parameter_tuple {
                 ($($param::construct($param),)*)
             }
 
-            fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+            fn get_component_types() -> impl Iterator<Item = Borrow> {
                 std::iter::empty()
                     $(
                         .chain($param::get_component_types())

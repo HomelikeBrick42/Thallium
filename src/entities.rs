@@ -1,7 +1,5 @@
-use std::any::TypeId;
-
 use crate::{
-    system::{BorrowType, RunState},
+    system::{Borrow, RunState},
     system_parameters::SystemParameter,
 };
 use slotmap::SlotMap;
@@ -33,11 +31,11 @@ impl<'a> SystemParameter for Entities<'a> {
         Entities { entities: state }
     }
 
-    fn get_resource_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+    fn get_resource_types() -> impl Iterator<Item = Borrow> {
         std::iter::empty()
     }
 
-    fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+    fn get_component_types() -> impl Iterator<Item = Borrow> {
         std::iter::empty()
     }
 }
