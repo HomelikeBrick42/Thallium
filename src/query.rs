@@ -177,3 +177,65 @@ where
         SecondaryMap::get_disjoint_mut(self.as_mut()?, entities)
     }
 }
+
+macro_rules! component_container_tuple {
+    ($($param:ident),*) => {
+        impl<'a, $($param),*> ComponentContainerTrait<'a> for ($($param,)*)
+        where
+            $($param: ComponentContainerTrait<'a>,)*
+        {
+            type Parameter<'param> = ($($param::Parameter<'param>,)*)
+            where
+                Self: 'param;
+            type ParameterMut<'param> = ($($param::ParameterMut<'param>,)*)
+            where
+                Self: 'param;
+
+            fn get(&self, entity: Entity) -> Option<Self::Parameter<'_>> {
+                _ = entity;
+                #[allow(non_snake_case)]
+                let ($($param,)*) = self;
+                Some(($($param.get(entity)?,)*))
+            }
+
+            fn get_mut(&mut self, entity: Entity) -> Option<Self::ParameterMut<'_>> {
+                _ = entity;
+                #[allow(non_snake_case)]
+                let ($($param,)*) = self;
+                Some(($($param.get_mut(entity)?,)*))
+            }
+
+            fn get_many_mut<const LEN: usize>(
+                &mut self,
+                entities: [Entity; LEN],
+            ) -> Option<[Self::ParameterMut<'_>; LEN]> {
+                _ = entities;
+                #[allow(non_snake_case)]
+                let ($($param,)*) = self;
+                $(
+                    #[allow(non_snake_case)]
+                    let mut $param = $param.get_many_mut(entities)?.into_iter();
+                )*
+                Some(std::array::from_fn(|_| ($($param.next().unwrap(),)*)))
+            }
+        }
+    };
+}
+
+component_container_tuple!();
+component_container_tuple!(A);
+component_container_tuple!(A, B);
+component_container_tuple!(A, B, C);
+component_container_tuple!(A, B, C, D);
+component_container_tuple!(A, B, C, D, E);
+component_container_tuple!(A, B, C, D, E, F);
+component_container_tuple!(A, B, C, D, E, F, G);
+component_container_tuple!(A, B, C, D, E, F, G, H);
+component_container_tuple!(A, B, C, D, E, F, G, H, I);
+component_container_tuple!(A, B, C, D, E, F, G, H, I, J);
+component_container_tuple!(A, B, C, D, E, F, G, H, I, J, K);
+component_container_tuple!(A, B, C, D, E, F, G, H, I, J, K, L);
+component_container_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M);
+component_container_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N);
+component_container_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
+component_container_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);

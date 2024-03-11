@@ -77,3 +77,53 @@ where
         std::iter::once((TypeId::of::<C>(), BorrowType::Mutable))
     }
 }
+
+macro_rules! query_parameter_tuple {
+    ($($param:ident),*) => {
+        impl<$($param),*> QueryParameter for ($($param,)*)
+        where
+            $($param: QueryParameter,)*
+        {
+            type ComponentContainerLock<'a> = ($($param::ComponentContainerLock<'a>,)*);
+            type ComponentContainer<'a> = ($($param::ComponentContainer<'a>,)*);
+
+            #[allow(clippy::unused_unit)]
+            fn lock(state: RunState<'_>) -> Self::ComponentContainerLock<'_> {
+                _ = state;
+                ($($param::lock(state),)*)
+            }
+
+            #[allow(clippy::unused_unit)]
+            fn construct<'this>(state: &'this mut Self::ComponentContainerLock<'_>) -> Self::ComponentContainer<'this> {
+                #[allow(non_snake_case)]
+                let ($($param,)*) = state;
+                ($($param::construct($param),)*)
+            }
+
+            fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+                std::iter::empty()
+                    $(
+                        .chain($param::get_component_types())
+                    )*
+            }
+        }
+    };
+}
+
+query_parameter_tuple!();
+query_parameter_tuple!(A);
+query_parameter_tuple!(A, B);
+query_parameter_tuple!(A, B, C);
+query_parameter_tuple!(A, B, C, D);
+query_parameter_tuple!(A, B, C, D, E);
+query_parameter_tuple!(A, B, C, D, E, F);
+query_parameter_tuple!(A, B, C, D, E, F, G);
+query_parameter_tuple!(A, B, C, D, E, F, G, H);
+query_parameter_tuple!(A, B, C, D, E, F, G, H, I);
+query_parameter_tuple!(A, B, C, D, E, F, G, H, I, J);
+query_parameter_tuple!(A, B, C, D, E, F, G, H, I, J, K);
+query_parameter_tuple!(A, B, C, D, E, F, G, H, I, J, K, L);
+query_parameter_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M);
+query_parameter_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N);
+query_parameter_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
+query_parameter_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
