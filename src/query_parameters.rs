@@ -78,6 +78,30 @@ where
     }
 }
 
+pub struct OptionalComponentContainer<T>(pub(crate) T);
+
+impl<P> QueryParameter for Option<P>
+where
+    P: QueryParameter,
+{
+    type ComponentContainerLock<'a> = P::ComponentContainerLock<'a>;
+    type ComponentContainer<'a> = OptionalComponentContainer<P::ComponentContainer<'a>>;
+
+    fn lock(state: RunState<'_>) -> Self::ComponentContainerLock<'_> {
+        P::lock(state)
+    }
+
+    fn construct<'a>(
+        lock: &'a mut Self::ComponentContainerLock<'_>,
+    ) -> Self::ComponentContainer<'a> {
+        OptionalComponentContainer(P::construct(lock))
+    }
+
+    fn get_component_types() -> impl Iterator<Item = (TypeId, BorrowType)> {
+        P::get_component_types()
+    }
+}
+
 macro_rules! query_parameter_tuple {
     ($($param:ident),*) => {
         impl<$($param),*> QueryParameter for ($($param,)*)

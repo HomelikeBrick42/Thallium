@@ -1,6 +1,6 @@
 use crate::{
     entities::Entity,
-    query_parameters::QueryParameter,
+    query_parameters::{OptionalComponentContainer, QueryParameter},
     system::{BorrowType, RunState},
     system_parameters::SystemParameter,
 };
@@ -175,6 +175,37 @@ where
         entities: [Entity; N],
     ) -> Option<[Self::ParameterMut<'_>; N]> {
         SecondaryMap::get_disjoint_mut(self.as_mut()?, entities)
+    }
+}
+
+impl<'a, T> ComponentContainerTrait<'a> for OptionalComponentContainer<T>
+where
+    T: ComponentContainerTrait<'a>,
+{
+    type Parameter<'param> = Option<T::Parameter<'param>>
+    where
+        Self: 'param;
+
+    type ParameterMut<'param> = Option<T::ParameterMut<'param>>
+    where
+        Self: 'param;
+
+    fn get(&self, entity: Entity) -> Option<Self::Parameter<'_>> {
+        Some(self.0.get(entity))
+    }
+
+    fn get_mut(&mut self, entity: Entity) -> Option<Self::ParameterMut<'_>> {
+        Some(self.0.get_mut(entity))
+    }
+
+    fn get_many_mut<const N: usize>(
+        &mut self,
+        entities: [Entity; N],
+    ) -> Option<[Self::ParameterMut<'_>; N]> {
+        let mut parameters = self.0.get_many_mut(entities).map(IntoIterator::into_iter);
+        Some(std::array::from_fn(|_| {
+            parameters.as_mut().and_then(|parameter| parameter.next())
+        }))
     }
 }
 

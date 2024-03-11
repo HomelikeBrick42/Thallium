@@ -24,6 +24,11 @@ mod tests {
         }
         impl Component for TestComponent {}
 
+        struct TestComponent2 {
+            value: i32,
+        }
+        impl Component for TestComponent2 {}
+
         let mut app = App::new();
 
         let entity1 = app.create_entity();
@@ -31,6 +36,7 @@ mod tests {
 
         let entity2 = app.create_entity();
         app.add_component(entity2, TestComponent { value: 44 });
+        app.add_component(entity2, TestComponent2 { value: 0 });
 
         app.run_once(move |mut q: Query<'_, RefMut<TestComponent>>| {
             let [c1, c2] = q.get_many_mut([entity1, entity2]).unwrap();
@@ -40,12 +46,25 @@ mod tests {
             c2.value -= 1;
         });
 
-        app.run_once(|entities: Entities<'_>, q: Query<'_, Ref<TestComponent>>| {
-            for entity in entities.iter() {
-                if let Some(c) = q.get(entity) {
+        #[allow(clippy::type_complexity)]
+        app.run_once(
+            |entities: Entities<'_>,
+             q: Query<
+                '_,
+                (
+                    Ref<TestComponent>,
+                    Option<(Ref<TestComponent2>, Ref<TestComponent>)>,
+                ),
+            >| {
+                for entity in entities.iter() {
+                    let (c, c2) = q.get(entity).unwrap();
                     assert_eq!(c.value, 43);
+                    if let Some((c2, c)) = c2 {
+                        assert_eq!(c2.value, 0);
+                        assert_eq!(c.value, 43);
+                    }
                 }
-            }
-        });
+            },
+        );
     }
 }
