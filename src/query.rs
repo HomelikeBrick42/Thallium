@@ -204,7 +204,9 @@ where
     ) -> Option<[Self::ParameterMut<'_>; N]> {
         let mut parameters = self.0.get_many_mut(entities).map(IntoIterator::into_iter);
         Some(std::array::from_fn(|_| {
-            parameters.as_mut().and_then(|parameter| parameter.next())
+            parameters
+                .as_mut()
+                .map(|parameter| parameter.next().unwrap())
         }))
     }
 }
