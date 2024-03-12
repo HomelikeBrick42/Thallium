@@ -123,6 +123,8 @@ impl App {
             }
 
             system_group.systems.push(system);
+            system_group.resources.extend(resources);
+            system_group.components.extend(components);
             return;
         }
         self.system_groups.push(SystemGroup {
