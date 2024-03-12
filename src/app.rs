@@ -9,14 +9,21 @@ use crate::{
 };
 use hashbrown::HashMap;
 use parking_lot::RwLock;
+use rayon::prelude::*;
 use slotmap::SlotMap;
 use std::{any::TypeId, marker::PhantomData};
+
+struct SystemGroup {
+    resources: HashMap<TypeId, BorrowType>,
+    components: HashMap<TypeId, BorrowType>,
+    systems: Vec<Box<dyn System>>,
+}
 
 pub struct App {
     resources: ResourceMap,
     entities: SlotMap<Entity, ()>,
     components: ComponentMap,
-    systems: Vec<Box<dyn System>>,
+    system_groups: Vec<SystemGroup>,
 }
 
 impl App {
@@ -25,7 +32,7 @@ impl App {
             resources: HashMap::new(),
             entities: SlotMap::with_key(),
             components: HashMap::new(),
-            systems: Vec::new(),
+            system_groups: Vec::new(),
         }
     }
 
@@ -92,9 +99,37 @@ impl App {
         SystemWrapper<S, Marker>: System,
         S: SystemFunction<Marker>,
     {
-        Self::check_system::<S, Marker>();
-        self.systems
-            .push(Box::new(SystemWrapper(system, PhantomData)));
+        let system = Box::new(SystemWrapper(system, PhantomData));
+        let (resources, components) = Self::check_system::<S, Marker>();
+        for system_group in &mut self.system_groups {
+            if system_group.resources.iter().any(|(id, borrow_type)| {
+                let other_borrow_type = &resources[id];
+                match (borrow_type, other_borrow_type) {
+                    (BorrowType::Immutable, BorrowType::Immutable) => false,
+                    (_, _) => true,
+                }
+            }) {
+                continue;
+            }
+
+            if system_group.components.iter().any(|(id, borrow_type)| {
+                let other_borrow_type = &components[id];
+                match (borrow_type, other_borrow_type) {
+                    (BorrowType::Immutable, BorrowType::Immutable) => false,
+                    (_, _) => true,
+                }
+            }) {
+                continue;
+            }
+
+            system_group.systems.push(system);
+            return;
+        }
+        self.system_groups.push(SystemGroup {
+            resources,
+            components,
+            systems: vec![system],
+        });
     }
 
     pub fn run_once<S, Marker>(&mut self, system: S)
@@ -111,11 +146,13 @@ impl App {
     }
 
     pub fn run_registered(&mut self) {
-        for system in &mut self.systems {
-            system.run(RunState {
-                resources: &self.resources,
-                entities: &self.entities,
-                components: &self.components,
+        for system_group in &mut self.system_groups {
+            system_group.systems.par_iter_mut().for_each(|system| {
+                system.run(RunState {
+                    resources: &self.resources,
+                    entities: &self.entities,
+                    components: &self.components,
+                })
             });
         }
     }
