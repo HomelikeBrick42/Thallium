@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 #![deny(elided_lifetimes_in_paths)]
+#![allow(clippy::type_complexity)]
 
 pub mod app;
 pub mod entities;
@@ -38,7 +39,7 @@ mod tests {
         app.add_component(entity2, TestComponent { value: 44 });
         app.add_component(entity2, TestComponent2 { value: 0 });
 
-        app.run_once(move |mut q: Query<'_, RefMut<TestComponent>>| {
+        app.register_system(move |mut q: Query<'_, RefMut<TestComponent>>| {
             let [c1, c2] = q.get_many_mut([entity1, entity2]).unwrap();
             assert_eq!(c1.value, 42);
             assert_eq!(c2.value, 44);
@@ -46,8 +47,7 @@ mod tests {
             c2.value -= 1;
         });
 
-        #[allow(clippy::type_complexity)]
-        app.run_once(
+        app.register_system(
             |entities: Entities<'_>,
              q: Query<
                 '_,
@@ -66,5 +66,7 @@ mod tests {
                 }
             },
         );
+
+        app.run_registered();
     }
 }
