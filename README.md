@@ -2,7 +2,7 @@
 
 [![Latest Version](https://img.shields.io/crates/v/thallium_ecs.svg)](https://crates.io/crates/thallium_ecs)
 [![Rust Documentation](https://docs.rs/thallium_ecs/badge.svg)](https://docs.rs/thallium_ecs)
-[![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/HomelikeBrick42/thallium_ecs/master/LICENSE)
+[![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/HomelikeBrick42/ThalliumECS/master/LICENSE)
 
 A basic ECS that ive been working on
 
