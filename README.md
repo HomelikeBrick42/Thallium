@@ -29,8 +29,8 @@ app.add_component(person1, Person {
     age: 23,
 });
 
-let person1 = app.create_entity();
-app.add_component(person1, Person {
+let person2 = app.create_entity();
+app.add_component(person2, Person {
     name: "Bob".into(),
     age: 25,
 });
