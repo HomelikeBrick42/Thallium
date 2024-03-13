@@ -26,7 +26,7 @@ let mut app = App::new();
 let person1 = app.create_entity();
 app.add_component(person1, Person {
     name: "Alice".into(),
-    age: 20,
+    age: 23,
 });
 
 let person1 = app.create_entity();
@@ -35,15 +35,7 @@ app.add_component(person1, Person {
     age: 25,
 });
 
-// increment the ages of all people
-app.run_once(|entities: Entities<'_>, mut q: Query<'_, RefMut<Person>>| {
-    for entity in entities.iter() {
-        if let Some(person) = q.get_mut(entity) {
-            person.age += 1;
-        }
-    }
-});
-
+// register a system that prints out all the people
 app.register_system(|entities: Entities<'_>, q: Query<'_, Ref<Person>>| {
     for entity in entities.iter() {
         if let Some(person) = q.get(entity) {
@@ -52,5 +44,26 @@ app.register_system(|entities: Entities<'_>, q: Query<'_, Ref<Person>>| {
     }
 });
 
+// print out all the people
+// should print:
+//
+// 'Alice' is 23 years old
+// 'Bob' is 25 years old
+app.run_registered();
+
+// increment the ages of all people, this only happens once
+app.run_once(|entities: Entities<'_>, mut q: Query<'_, RefMut<Person>>| {
+    for entity in entities.iter() {
+        if let Some(person) = q.get_mut(entity) {
+            person.age += 1;
+        }
+    }
+});
+
+// print out all the people again
+// should print:
+//
+// 'Alice' is 24 years old
+// 'Bob' is 26 years old
 app.run_registered();
 ```
