@@ -103,7 +103,9 @@ impl App {
         let (resources, components) = Self::check_system::<S, Marker>();
         for system_group in &mut self.system_groups {
             if system_group.resources.iter().any(|(id, borrow_type)| {
-                let other_borrow_type = &resources[id];
+                let Some(other_borrow_type) = resources.get(id) else {
+                    return false;
+                };
                 match (borrow_type, other_borrow_type) {
                     (BorrowType::Immutable, BorrowType::Immutable) => false,
                     (_, _) => true,
@@ -113,7 +115,9 @@ impl App {
             }
 
             if system_group.components.iter().any(|(id, borrow_type)| {
-                let other_borrow_type = &components[id];
+                let Some(other_borrow_type) = components.get(id) else {
+                    return false;
+                };
                 match (borrow_type, other_borrow_type) {
                     (BorrowType::Immutable, BorrowType::Immutable) => false,
                     (_, _) => true,
