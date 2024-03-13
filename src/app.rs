@@ -96,7 +96,7 @@ impl App {
 
     pub fn register_system<S, Marker>(&mut self, system: S)
     where
-        SystemWrapper<S, Marker>: System,
+        SystemWrapper<S, Marker>: System + 'static,
         S: SystemFunction<Marker>,
     {
         let system = Box::new(SystemWrapper(system, PhantomData));
@@ -138,13 +138,12 @@ impl App {
         });
     }
 
-    pub fn run_once<S, Marker>(&mut self, system: S)
+    pub fn run_once<S, Marker>(&mut self, mut system: S)
     where
-        SystemWrapper<S, Marker>: System,
         S: SystemFunction<Marker>,
     {
         Self::check_system::<S, Marker>();
-        SystemWrapper(system, PhantomData).run(RunState {
+        system.run(RunState {
             resources: &self.resources,
             entities: &self.entities,
             components: &self.components,

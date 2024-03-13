@@ -39,7 +39,7 @@ mod tests {
         app.add_component(entity2, TestComponent { value: 44 });
         app.add_component(entity2, TestComponent2 { value: 0 });
 
-        app.register_system(move |mut q: Query<'_, RefMut<TestComponent>>| {
+        app.run_once(|mut q: Query<'_, RefMut<TestComponent>>| {
             let [c1, c2] = q.get_many_mut([entity1, entity2]).unwrap();
             assert_eq!(c1.value, 42);
             assert_eq!(c2.value, 44);

@@ -29,14 +29,13 @@ pub struct Borrow {
     pub borrow_type: BorrowType,
 }
 
-pub trait System: Send + Sync + 'static {
+pub trait System: Send + Sync {
     fn run(&mut self, state: RunState<'_>);
 }
 
 pub struct SystemWrapper<F, Marker>(pub(crate) F, pub(crate) PhantomData<fn(Marker)>);
 impl<F, Marker> System for SystemWrapper<F, Marker>
 where
-    Marker: 'static,
     F: SystemFunction<Marker>,
 {
     fn run(&mut self, state: RunState<'_>) {
@@ -44,7 +43,7 @@ where
     }
 }
 
-pub trait SystemFunction<Marker>: Send + Sync + 'static {
+pub trait SystemFunction<Marker>: Send + Sync {
     fn run(&mut self, state: RunState<'_>);
     fn get_resource_types() -> impl Iterator<Item = Borrow>;
     fn get_component_types() -> impl Iterator<Item = Borrow>;
@@ -54,7 +53,7 @@ macro_rules! system_function_impl {
     ($($param:ident),*) => {
         impl<Func, $($param),*> SystemFunction<fn($($param),*)> for Func
         where
-            for<'a> Func: FnMut($($param),*) + FnMut($($param::This<'a>),*) + Send + Sync + 'static,
+            for<'a> Func: FnMut($($param),*) + FnMut($($param::This<'a>),*) + Send + Sync,
             $($param: SystemParameter,)*
         {
             fn run(&mut self, state: RunState<'_>) {
