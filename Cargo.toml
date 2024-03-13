@@ -3,7 +3,7 @@ name = "thallium_ecs"
 version = "0.1.5"
 edition = "2021"
 description = "A basic ECS"
-license-file = "LICENCE"
+license-file = "MIT"
 repository = "https://github.com/HomelikeBrick42/ThalliumECS"
 
 [dependencies]
