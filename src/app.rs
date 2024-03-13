@@ -147,7 +147,7 @@ impl App {
             resources: &self.resources,
             entities: &self.entities,
             components: &self.components,
-        });
+        })
     }
 
     pub fn run_registered(&mut self) {
