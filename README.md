@@ -13,6 +13,7 @@ use thallium_ecs::{
     app::App,
     entities::Entities,
     query::{Component, Query, Ref, RefMut},
+    system_set::SystemSet,
 };
 
 struct Person {
@@ -35,8 +36,9 @@ app.add_component(person2, Person {
     age: 25,
 });
 
-// register a system that prints out all the people
-app.register_system(|entities: Entities<'_>, q: Query<'_, Ref<Person>>| {
+// create a system set that prints all people
+let mut print_people = SystemSet::new();
+print_people.register_system(|entities: Entities<'_>, q: Query<'_, Ref<Person>>| {
     for entity in entities.iter() {
         if let Some(person) = q.get(entity) {
             println!("'{}' is {} years old", person.name, person.age);
@@ -49,10 +51,10 @@ app.register_system(|entities: Entities<'_>, q: Query<'_, Ref<Person>>| {
 //
 // 'Alice' is 23 years old
 // 'Bob' is 25 years old
-app.run_registered();
+app.run(&mut print_people);
 
-// increment the ages of all people, this only happens once
-app.run_once(|entities: Entities<'_>, mut q: Query<'_, RefMut<Person>>| {
+// increment the ages of all people
+app.run(|entities: Entities<'_>, mut q: Query<'_, RefMut<Person>>| {
     for entity in entities.iter() {
         if let Some(person) = q.get_mut(entity) {
             person.age += 1;
@@ -65,5 +67,5 @@ app.run_once(|entities: Entities<'_>, mut q: Query<'_, RefMut<Person>>| {
 //
 // 'Alice' is 24 years old
 // 'Bob' is 26 years old
-app.run_registered();
+app.run(&mut print_people);
 ```

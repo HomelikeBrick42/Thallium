@@ -10,6 +10,7 @@ pub mod query_parameters;
 pub mod resource;
 pub mod system;
 pub mod system_parameters;
+pub mod system_set;
 
 #[cfg(test)]
 mod tests {
@@ -17,6 +18,7 @@ mod tests {
         app::App,
         entities::Entities,
         query::{Component, Query, Ref, RefMut},
+        system_set::SystemSet,
     };
 
     #[test]
@@ -40,7 +42,7 @@ mod tests {
         app.add_component(entity2, TestComponent { value: 44 });
         app.add_component(entity2, TestComponent2 { value: 0 });
 
-        app.run_once(|mut q: Query<'_, RefMut<TestComponent>>| {
+        app.run(|mut q: Query<'_, RefMut<TestComponent>>| {
             let [c1, c2] = q.get_many_mut([entity1, entity2]).unwrap();
             assert_eq!(c1.value, 42);
             assert_eq!(c2.value, 44);
@@ -48,7 +50,8 @@ mod tests {
             c2.value -= 1;
         });
 
-        app.register_system(
+        let mut set = SystemSet::new();
+        set.register_system(
             |entities: Entities<'_>,
              q: Query<
                 '_,
@@ -67,7 +70,6 @@ mod tests {
                 }
             },
         );
-
-        app.run_registered();
+        app.run(&mut set);
     }
 }
