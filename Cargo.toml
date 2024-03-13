@@ -4,6 +4,7 @@ version = "0.1.5"
 edition = "2021"
 description = "A basic ECS"
 license-file = "LICENCE"
+repository = "https://github.com/HomelikeBrick42/ThalliumECS"
 
 [dependencies]
 hashbrown = "0.14.3"
