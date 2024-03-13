@@ -1,7 +1,9 @@
 [package]
-name = "ecs"
+name = "thallium_ecs"
 version = "0.1.0"
 edition = "2021"
+description = "A basic ECS"
+license-file = "LICENCE"
 
 [dependencies]
 hashbrown = "0.14.3"
