@@ -16,6 +16,12 @@ pub struct Entities<'a> {
 }
 
 impl<'a> Entities<'a> {
+    pub fn entity_exists(&self, entity: Entity) -> bool {
+        self.entities
+            .get(entity.id)
+            .map_or(false, |&(generation, _)| generation == entity.generation)
+    }
+
     pub fn iter(&self) -> impl ExactSizeIterator<Item = Entity> + 'a {
         self.entities
             .iter()

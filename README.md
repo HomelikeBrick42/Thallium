@@ -38,11 +38,9 @@ app.add_component(person2, Person {
 
 // create a system set that prints all people
 let mut print_people = SystemSet::new();
-print_people.register_system(|entities: Entities<'_>, q: Query<'_, Ref<Person>>| {
-    for entity in entities.iter() {
-        if let Some(person) = q.get(entity) {
-            println!("'{}' is {} years old", person.name, person.age);
-        }
+print_people.register_system(|q: Query<'_, Ref<Person>>| {
+    for (_, person) in q.iter() {
+        println!("'{}' is {} years old", person.name, person.age);
     }
 });
 
@@ -54,6 +52,13 @@ print_people.register_system(|entities: Entities<'_>, q: Query<'_, Ref<Person>>|
 app.run(&mut print_people);
 
 // increment the ages of all people
+app.run(|mut q: Query<'_, RefMut<Person>>| {
+    for (_, person) in q.iter_mut() {
+        person.age += 1;
+    }
+});
+
+// another way to increment the ages of all people would be
 app.run(|entities: Entities<'_>, mut q: Query<'_, RefMut<Person>>| {
     for entity in entities.iter() {
         if let Some(person) = q.get_mut(entity) {
@@ -65,7 +70,7 @@ app.run(|entities: Entities<'_>, mut q: Query<'_, RefMut<Person>>| {
 // print out all the people again
 // should print:
 //
-// 'Alice' is 24 years old
-// 'Bob' is 26 years old
+// 'Alice' is 25 years old
+// 'Bob' is 27 years old
 app.run(&mut print_people);
 ```
