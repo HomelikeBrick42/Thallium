@@ -74,10 +74,10 @@ impl App {
     }
 
     pub fn destroy_entity(&mut self, entity: Entity) {
-        if self
+        if !self
             .entities
             .get(entity.id)
-            .map_or(false, |&(generation, _)| generation != entity.generation)
+            .map_or(false, |&(generation, _)| generation == entity.generation)
         {
             self.entities[entity.id].0 |= NonZeroUsize::MIN;
             for id in self.entities[entity.id].1.drain() {
@@ -93,10 +93,10 @@ impl App {
     where
         C: Component,
     {
-        if self
+        if !self
             .entities
             .get(entity.id)
-            .map_or(false, |&(generation, _)| generation != entity.generation)
+            .map_or(false, |&(generation, _)| generation == entity.generation)
         {
             return;
         }
