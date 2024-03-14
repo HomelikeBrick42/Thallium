@@ -202,7 +202,7 @@ dependencies = [
 
 [[package]]
 name = "thallium_ecs"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "hashbrown",
  "parking_lot",
