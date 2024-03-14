@@ -3,16 +3,16 @@ use crate::{
     entities::Entity,
     query::Component,
     resource::Resource,
-    system::{ComponentMap, ResourceMap, RunState, System, SystemWrapper},
+    system::{ComponentMap, EntityMap, ResourceMap, RunState, System, SystemWrapper},
 };
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use parking_lot::RwLock;
 use std::{any::TypeId, marker::PhantomData, num::NonZeroUsize};
 
 pub struct App {
     resources: ResourceMap,
     next_free_entity: usize,
-    entities: Vec<NonZeroUsize>,
+    entities: EntityMap,
     components: ComponentMap,
 }
 
@@ -46,10 +46,11 @@ impl App {
     pub fn create_entity(&mut self) -> Entity {
         let id = self.next_free_entity;
         if id < self.entities.len() {
-            let generation = self.entities[id];
-            self.entities[id] = NonZeroUsize::new(generation.get() + 1).unwrap();
+            let (generation, _) = self.entities[id];
+            let generation = NonZeroUsize::new(generation.get() + 1).unwrap();
+            self.entities[id].0 = generation;
 
-            while let Some(&generation) = self.entities.get(self.next_free_entity) {
+            while let Some(&(generation, _)) = self.entities.get(self.next_free_entity) {
                 self.next_free_entity += 1;
                 if generation.get() & 1 != 0 {
                     break;
@@ -63,7 +64,7 @@ impl App {
                 None => unreachable!(),
             };
 
-            self.entities.push(NEW_GENERATION);
+            self.entities.push((NEW_GENERATION, HashSet::new()));
             self.next_free_entity = self.entities.len();
             Entity {
                 id,
@@ -73,9 +74,18 @@ impl App {
     }
 
     pub fn destroy_entity(&mut self, entity: Entity) {
-        if self.entities.get(entity.id) == Some(&entity.generation) {
-            self.entities[entity.id] |= NonZeroUsize::MIN;
-            if self.next_free_entity > entity.id {}
+        if self
+            .entities
+            .get(entity.id)
+            .map_or(false, |&(generation, _)| generation != entity.generation)
+        {
+            self.entities[entity.id].0 |= NonZeroUsize::MIN;
+            for id in self.entities[entity.id].1.drain() {
+                self.components[&id].write().remove(entity);
+            }
+            if entity.id < self.next_free_entity {
+                self.next_free_entity = entity.id;
+            }
         }
     }
 
@@ -83,28 +93,40 @@ impl App {
     where
         C: Component,
     {
-        if self.entities.get(entity.id) != Some(&entity.generation) {
+        if self
+            .entities
+            .get(entity.id)
+            .map_or(false, |&(generation, _)| generation != entity.generation)
+        {
             return;
         }
 
+        let component_id = TypeId::of::<C>();
         self.components
-            .entry(TypeId::of::<C>())
+            .entry(component_id)
             .or_insert_with(|| RwLock::new(Box::new(ComponentContainer::<C>::new())))
             .get_mut()
-            .downcast_mut::<ComponentContainer<C>>()
-            .unwrap()
+            .downcast_mut::<C>()
             .insert(entity, component);
+
+        self.entities[entity.id].1.insert(component_id);
     }
 
     pub fn remove_component<C>(&mut self, entity: Entity) -> Option<C>
     where
         C: Component,
     {
+        if self.entities.get(entity.id)?.0 != entity.generation {
+            return None;
+        }
+
+        let component_id = TypeId::of::<C>();
+        self.entities[entity.id].1.remove(&component_id);
+
         self.components
-            .get_mut(&TypeId::of::<C>())?
+            .get_mut(&component_id)?
             .get_mut()
-            .downcast_mut::<ComponentContainer<C>>()
-            .unwrap()
+            .downcast_mut::<C>()
             .remove(entity)
     }
 

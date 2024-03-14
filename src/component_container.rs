@@ -1,5 +1,48 @@
 use crate::{entities::Entity, query::Component};
-use std::num::NonZeroUsize;
+use std::{any::Any, num::NonZeroUsize};
+
+pub(crate) trait DynComponentContainer: Send + Sync {
+    fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+    fn remove(&mut self, entity: Entity);
+}
+
+impl<C> DynComponentContainer for ComponentContainer<C>
+where
+    C: Component,
+{
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn remove(&mut self, entity: Entity) {
+        self.remove(entity);
+    }
+}
+
+impl dyn DynComponentContainer {
+    pub fn downcast_ref<C>(&self) -> &ComponentContainer<C>
+    where
+        C: Component,
+    {
+        self.as_any()
+            .downcast_ref::<ComponentContainer<C>>()
+            .unwrap()
+    }
+
+    pub fn downcast_mut<C>(&mut self) -> &mut ComponentContainer<C>
+    where
+        C: Component,
+    {
+        self.as_any_mut()
+            .downcast_mut::<ComponentContainer<C>>()
+            .unwrap()
+    }
+}
 
 pub struct ComponentContainer<C>
 where

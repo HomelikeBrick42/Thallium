@@ -33,7 +33,7 @@ where
                 .get(&TypeId::of::<C>())?
                 .try_read()
                 .expect("the lock should always be available"),
-            |components| components.downcast_ref::<ComponentContainer<C>>().unwrap(),
+            |components| components.downcast_ref::<C>(),
         ))
     }
 
@@ -66,7 +66,7 @@ where
                 .get(&TypeId::of::<C>())?
                 .try_write()
                 .expect("the lock should always be available"),
-            |components| components.downcast_mut::<ComponentContainer<C>>().unwrap(),
+            |components| components.downcast_mut::<C>(),
         ))
     }
 

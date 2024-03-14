@@ -1,5 +1,5 @@
 use crate::{
-    system::{Borrow, RunState},
+    system::{Borrow, EntityMap, RunState},
     system_parameters::SystemParameter,
 };
 use std::num::NonZeroUsize;
@@ -12,7 +12,7 @@ pub struct Entity {
 
 #[derive(Clone, Copy)]
 pub struct Entities<'a> {
-    entities: &'a Vec<NonZeroUsize>,
+    entities: &'a EntityMap,
 }
 
 impl<'a> Entities<'a> {
@@ -20,13 +20,13 @@ impl<'a> Entities<'a> {
         self.entities
             .iter()
             .enumerate()
-            .map(|(id, &generation)| Entity { id, generation })
+            .map(|(id, &(generation, _))| Entity { id, generation })
     }
 }
 
 impl<'a> SystemParameter for Entities<'a> {
     type This<'this> = Entities<'this>;
-    type Lock<'state> = &'state Vec<NonZeroUsize>;
+    type Lock<'state> = &'state EntityMap;
 
     fn lock(state: RunState<'_>) -> Self::Lock<'_> {
         state.entities

@@ -4,6 +4,7 @@
 #![allow(clippy::type_complexity)]
 
 pub mod app;
+pub mod component_container;
 pub mod entities;
 pub mod query;
 pub mod query_parameters;
@@ -11,7 +12,6 @@ pub mod resource;
 pub mod system;
 pub mod system_parameters;
 pub mod system_set;
-pub mod component_container;
 
 #[cfg(test)]
 mod tests {
