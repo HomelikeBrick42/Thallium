@@ -4,6 +4,7 @@
 #![allow(clippy::type_complexity)]
 
 pub mod app;
+pub mod component_container;
 pub mod entities;
 pub mod query;
 pub mod query_parameters;

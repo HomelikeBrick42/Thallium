@@ -1,19 +1,20 @@
-use crate::{entities::Entity, system_parameters::SystemParameter};
-use hashbrown::HashMap;
+use crate::{component_container::DynComponentContainer, system_parameters::SystemParameter};
+use hashbrown::{HashMap, HashSet};
 use parking_lot::RwLock;
-use slotmap::{SecondaryMap, SlotMap};
 use std::{
     any::{Any, TypeId},
     marker::PhantomData,
+    num::NonZeroUsize,
 };
 
 pub(crate) type ResourceMap = HashMap<TypeId, RwLock<Box<dyn Any + Send + Sync>>>;
-pub(crate) type ComponentMap = HashMap<TypeId, RwLock<Box<dyn Any + Send + Sync>>>;
-pub(crate) type ComponentContainer<T> = SecondaryMap<Entity, T>;
+pub(crate) type EntityMap = Vec<(NonZeroUsize, HashSet<TypeId>)>;
+pub(crate) type ComponentMap = HashMap<TypeId, RwLock<Box<dyn DynComponentContainer>>>;
+
 #[derive(Clone, Copy)]
 pub struct RunState<'a> {
     pub(crate) resources: &'a ResourceMap,
-    pub(crate) entities: &'a SlotMap<Entity, ()>,
+    pub(crate) entities: &'a EntityMap,
     pub(crate) components: &'a ComponentMap,
 }
 

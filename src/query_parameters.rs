@@ -1,13 +1,12 @@
-use std::any::TypeId;
-
+use crate::{
+    component_container::ComponentContainer,
+    query::{Component, ComponentContainerTrait, Ref, RefMut},
+    system::{Borrow, BorrowType, RunState},
+};
 use parking_lot::{
     MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLockReadGuard, RwLockWriteGuard,
 };
-
-use crate::{
-    query::{Component, ComponentContainerTrait, Ref, RefMut},
-    system::{Borrow, BorrowType, ComponentContainer, RunState},
-};
+use std::any::TypeId;
 
 pub trait QueryParameter {
     type ComponentContainerLock<'a>;
@@ -34,7 +33,7 @@ where
                 .get(&TypeId::of::<C>())?
                 .try_read()
                 .expect("the lock should always be available"),
-            |components| components.downcast_ref::<ComponentContainer<C>>().unwrap(),
+            |components| components.downcast_ref::<C>(),
         ))
     }
 
@@ -67,7 +66,7 @@ where
                 .get(&TypeId::of::<C>())?
                 .try_write()
                 .expect("the lock should always be available"),
-            |components| components.downcast_mut::<ComponentContainer<C>>().unwrap(),
+            |components| components.downcast_mut::<C>(),
         ))
     }
 

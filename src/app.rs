@@ -1,17 +1,18 @@
 use crate::{
+    component_container::ComponentContainer,
     entities::Entity,
     query::Component,
     resource::Resource,
-    system::{ComponentContainer, ComponentMap, ResourceMap, RunState, System, SystemWrapper},
+    system::{ComponentMap, EntityMap, ResourceMap, RunState, System, SystemWrapper},
 };
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use parking_lot::RwLock;
-use slotmap::SlotMap;
-use std::{any::TypeId, marker::PhantomData};
+use std::{any::TypeId, marker::PhantomData, num::NonZeroUsize};
 
 pub struct App {
     resources: ResourceMap,
-    entities: SlotMap<Entity, ()>,
+    next_free_entity: usize,
+    entities: EntityMap,
     components: ComponentMap,
 }
 
@@ -19,7 +20,8 @@ impl App {
     pub fn new() -> Self {
         Self {
             resources: HashMap::new(),
-            entities: SlotMap::with_key(),
+            next_free_entity: 0,
+            entities: Vec::new(),
             components: HashMap::new(),
         }
     }
@@ -42,43 +44,87 @@ impl App {
     }
 
     pub fn create_entity(&mut self) -> Entity {
-        self.entities.insert(())
+        let id = self.next_free_entity;
+        if id < self.entities.len() {
+            let (generation, _) = self.entities[id];
+            let generation = NonZeroUsize::new(generation.get() + 1).unwrap();
+            self.entities[id].0 = generation;
+
+            while let Some(&(generation, _)) = self.entities.get(self.next_free_entity) {
+                self.next_free_entity += 1;
+                if generation.get() & 1 != 0 {
+                    break;
+                }
+            }
+
+            Entity { id, generation }
+        } else {
+            const NEW_GENERATION: NonZeroUsize = match NonZeroUsize::new(2) {
+                Some(generation) => generation,
+                None => unreachable!(),
+            };
+
+            self.entities.push((NEW_GENERATION, HashSet::new()));
+            self.next_free_entity = self.entities.len();
+            Entity {
+                id,
+                generation: NEW_GENERATION,
+            }
+        }
     }
 
     pub fn destroy_entity(&mut self, entity: Entity) {
-        self.entities.remove(entity);
+        if self.entity_exists(entity) {
+            self.entities[entity.id].0 |= NonZeroUsize::MIN;
+            for id in self.entities[entity.id].1.drain() {
+                self.components[&id].write().remove(entity);
+            }
+            if entity.id < self.next_free_entity {
+                self.next_free_entity = entity.id;
+            }
+        }
+    }
+
+    pub fn entity_exists(&self, entity: Entity) -> bool {
+        self.entities
+            .get(entity.id)
+            .map_or(false, |&(generation, _)| generation == entity.generation)
     }
 
     pub fn add_component<C>(&mut self, entity: Entity, component: C)
     where
         C: Component,
     {
-        if !self.entities.contains_key(entity) {
+        if !self.entity_exists(entity) {
             return;
         }
 
+        let component_id = TypeId::of::<C>();
         self.components
-            .entry(TypeId::of::<C>())
+            .entry(component_id)
             .or_insert_with(|| RwLock::new(Box::new(ComponentContainer::<C>::new())))
             .get_mut()
-            .downcast_mut::<ComponentContainer<C>>()
-            .unwrap()
+            .downcast_mut::<C>()
             .insert(entity, component);
+
+        self.entities[entity.id].1.insert(component_id);
     }
 
     pub fn remove_component<C>(&mut self, entity: Entity) -> Option<C>
     where
         C: Component,
     {
-        if !self.entities.contains_key(entity) {
+        if !self.entity_exists(entity) {
             return None;
         }
 
+        let component_id = TypeId::of::<C>();
+        self.entities[entity.id].1.remove(&component_id);
+
         self.components
-            .get_mut(&TypeId::of::<C>())?
+            .get_mut(&component_id)?
             .get_mut()
-            .downcast_mut::<ComponentContainer<C>>()
-            .unwrap()
+            .downcast_mut::<C>()
             .remove(entity)
     }
 

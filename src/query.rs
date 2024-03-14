@@ -1,10 +1,10 @@
 use crate::{
+    component_container::ComponentContainer,
     entities::Entity,
     query_parameters::{OptionalComponentContainer, QueryParameter},
     system::{Borrow, RunState},
     system_parameters::SystemParameter,
 };
-use slotmap::{SecondaryMap, SlotMap};
 use std::marker::PhantomData;
 
 pub trait Component: Sized + Send + Sync + 'static {}
@@ -21,7 +21,6 @@ pub struct Query<'a, Q>
 where
     Q: QueryParameter,
 {
-    entities: &'a SlotMap<Entity, ()>,
     container: Q::ComponentContainer<'a>,
 }
 
@@ -30,19 +29,14 @@ where
     Q: QueryParameter,
 {
     type This<'this> = Query<'this, Q>;
-    type Lock<'state> = (
-        &'state SlotMap<Entity, ()>,
-        Q::ComponentContainerLock<'state>,
-    );
+    type Lock<'state> = Q::ComponentContainerLock<'state>;
 
     fn lock(state: RunState<'_>) -> Self::Lock<'_> {
-        (state.entities, Q::lock(state))
+        Q::lock(state)
     }
 
     fn construct<'this>(state: &'this mut Self::Lock<'_>) -> Self::This<'this> {
-        let (entities, state) = state;
         Query {
-            entities,
             container: Q::construct(state),
         }
     }
@@ -64,22 +58,14 @@ where
         &'b self,
         entity: Entity,
     ) -> Option<<Q::ComponentContainer<'a> as ComponentContainerTrait<'a>>::Parameter<'b>> {
-        if self.entities.contains_key(entity) {
-            self.container.get(entity)
-        } else {
-            None
-        }
+        self.container.get(entity)
     }
 
     pub fn get_mut<'b>(
         &'b mut self,
         entity: Entity,
     ) -> Option<<Q::ComponentContainer<'a> as ComponentContainerTrait<'a>>::ParameterMut<'b>> {
-        if self.entities.contains_key(entity) {
-            self.container.get_mut(entity)
-        } else {
-            None
-        }
+        self.container.get_mut(entity)
     }
 
     pub fn get_many_mut<'b, const N: usize>(
@@ -87,14 +73,7 @@ where
         entities: [Entity; N],
     ) -> Option<[<Q::ComponentContainer<'a> as ComponentContainerTrait<'a>>::ParameterMut<'b>; N]>
     {
-        if entities
-            .iter()
-            .all(|&entity| self.entities.contains_key(entity))
-        {
-            self.container.get_many_mut(entities)
-        } else {
-            None
-        }
+        self.container.get_many_mut(entities)
     }
 }
 
@@ -114,7 +93,7 @@ pub trait ComponentContainerTrait<'a>: Send + Sync {
     ) -> Option<[Self::ParameterMut<'_>; N]>;
 }
 
-impl<'a, C> ComponentContainerTrait<'a> for Option<&'a SecondaryMap<Entity, C>>
+impl<'a, C> ComponentContainerTrait<'a> for Option<&'a ComponentContainer<C>>
 where
     C: Component,
 {
@@ -126,11 +105,11 @@ where
         Self: 'param;
 
     fn get(&self, entity: Entity) -> Option<Self::Parameter<'_>> {
-        SecondaryMap::get(self.as_ref()?, entity)
+        ComponentContainer::<C>::get(self.as_ref()?, entity)
     }
 
     fn get_mut(&mut self, entity: Entity) -> Option<Self::ParameterMut<'_>> {
-        SecondaryMap::get(self.as_mut()?, entity)
+        ComponentContainer::<C>::get(self.as_mut()?, entity)
     }
 
     fn get_many_mut<const N: usize>(
@@ -142,7 +121,7 @@ where
         // this could be replaced with `.try_map` when its stablized which would remove the double-iteration
         if entities
             .iter()
-            .all(|&entity| container.contains_key(entity))
+            .all(|&entity| container.get(entity).is_some())
         {
             Some(entities.map(|entity| container.get(entity).unwrap()))
         } else {
@@ -151,7 +130,7 @@ where
     }
 }
 
-impl<'a, C> ComponentContainerTrait<'a> for Option<&'a mut SecondaryMap<Entity, C>>
+impl<'a, C> ComponentContainerTrait<'a> for Option<&'a mut ComponentContainer<C>>
 where
     C: Component,
 {
@@ -163,18 +142,18 @@ where
         Self: 'param;
 
     fn get(&self, entity: Entity) -> Option<Self::Parameter<'_>> {
-        SecondaryMap::get(self.as_ref()?, entity)
+        ComponentContainer::<C>::get(self.as_ref()?, entity)
     }
 
     fn get_mut(&mut self, entity: Entity) -> Option<Self::ParameterMut<'_>> {
-        SecondaryMap::get_mut(self.as_mut()?, entity)
+        ComponentContainer::<C>::get_mut(self.as_mut()?, entity)
     }
 
     fn get_many_mut<const N: usize>(
         &mut self,
         entities: [Entity; N],
     ) -> Option<[Self::ParameterMut<'_>; N]> {
-        SecondaryMap::get_disjoint_mut(self.as_mut()?, entities)
+        ComponentContainer::<C>::get_many_mut(self.as_mut()?, entities)
     }
 }
 
