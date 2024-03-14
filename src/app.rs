@@ -74,11 +74,7 @@ impl App {
     }
 
     pub fn destroy_entity(&mut self, entity: Entity) {
-        if !self
-            .entities
-            .get(entity.id)
-            .map_or(false, |&(generation, _)| generation == entity.generation)
-        {
+        if self.entity_exists(entity) {
             self.entities[entity.id].0 |= NonZeroUsize::MIN;
             for id in self.entities[entity.id].1.drain() {
                 self.components[&id].write().remove(entity);
@@ -89,15 +85,17 @@ impl App {
         }
     }
 
+    pub fn entity_exists(&self, entity: Entity) -> bool {
+        self.entities
+            .get(entity.id)
+            .map_or(false, |&(generation, _)| generation == entity.generation)
+    }
+
     pub fn add_component<C>(&mut self, entity: Entity, component: C)
     where
         C: Component,
     {
-        if !self
-            .entities
-            .get(entity.id)
-            .map_or(false, |&(generation, _)| generation == entity.generation)
-        {
+        if !self.entity_exists(entity) {
             return;
         }
 
@@ -116,7 +114,7 @@ impl App {
     where
         C: Component,
     {
-        if self.entities.get(entity.id)?.0 != entity.generation {
+        if !self.entity_exists(entity) {
             return None;
         }
 
