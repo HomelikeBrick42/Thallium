@@ -1,13 +1,12 @@
-use std::any::TypeId;
-
+use crate::{
+    component_container::ComponentContainer,
+    query::{Component, ComponentContainerTrait, Ref, RefMut},
+    system::{Borrow, BorrowType, RunState},
+};
 use parking_lot::{
     MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLockReadGuard, RwLockWriteGuard,
 };
-
-use crate::{
-    query::{Component, ComponentContainerTrait, Ref, RefMut},
-    system::{Borrow, BorrowType, ComponentContainer, RunState},
-};
+use std::any::TypeId;
 
 pub trait QueryParameter {
     type ComponentContainerLock<'a>;

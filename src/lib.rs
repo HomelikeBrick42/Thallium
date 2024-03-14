@@ -11,6 +11,7 @@ pub mod resource;
 pub mod system;
 pub mod system_parameters;
 pub mod system_set;
+pub mod component_container;
 
 #[cfg(test)]
 mod tests {
