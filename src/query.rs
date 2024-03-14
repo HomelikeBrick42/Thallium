@@ -90,10 +90,9 @@ where
         self.entities
             .iter()
             .enumerate()
-            .filter_map(|(id, &(generation, _))| {
-                let entity = Entity { id, generation };
-                self.get(entity)
-            })
+            .map(|(id, &(generation, _))| Entity { id, generation })
+            .zip(self.container.iter())
+            .filter_map(|(entity, parameter)| parameter.map(|parameter| (entity, parameter)))
     }
 
     pub fn iter_mut<'b>(
@@ -128,6 +127,7 @@ pub trait ComponentContainerTrait<'a>: Send + Sync {
         entities: [Entity; N],
     ) -> Option<[Self::ParameterMut<'_>; N]>;
 
+    fn iter(&self) -> impl Iterator<Item = Option<Self::Parameter<'_>>>;
     fn iter_mut(&mut self) -> impl Iterator<Item = Option<Self::ParameterMut<'_>>>;
 }
 
@@ -167,6 +167,18 @@ where
         }
     }
 
+    fn iter(&self) -> impl Iterator<Item = Option<Self::Parameter<'_>>> {
+        self.as_ref().into_iter().flat_map(|this| {
+            this.components.iter().map(|slot| {
+                if let Some((_, component)) = slot {
+                    Some(component)
+                } else {
+                    None
+                }
+            })
+        })
+    }
+
     fn iter_mut(&mut self) -> impl Iterator<Item = Option<Self::ParameterMut<'_>>> {
         self.as_mut().into_iter().flat_map(|this| {
             this.components.iter().map(|slot| {
@@ -204,6 +216,18 @@ where
         entities: [Entity; N],
     ) -> Option<[Self::ParameterMut<'_>; N]> {
         ComponentContainer::<C>::get_many_mut(self.as_mut()?, entities)
+    }
+
+    fn iter(&self) -> impl Iterator<Item = Option<Self::Parameter<'_>>> {
+        self.as_ref().into_iter().flat_map(|this| {
+            this.components.iter().map(|slot| {
+                if let Some((_, component)) = slot {
+                    Some(component)
+                } else {
+                    None
+                }
+            })
+        })
     }
 
     fn iter_mut(&mut self) -> impl Iterator<Item = Option<Self::ParameterMut<'_>>> {
@@ -251,6 +275,10 @@ where
         }))
     }
 
+    fn iter(&self) -> impl Iterator<Item = Option<Self::Parameter<'_>>> {
+        self.0.iter().map(Some)
+    }
+
     fn iter_mut(&mut self) -> impl Iterator<Item = Option<Self::ParameterMut<'_>>> {
         self.0.iter_mut().map(Some)
     }
@@ -295,6 +323,28 @@ macro_rules! component_container_tuple {
                     let mut $param = $param.get_many_mut(entities)?.into_iter();
                 )*
                 Some(std::array::from_fn(|_| ($($param.next().unwrap(),)*)))
+            }
+
+            fn iter(&self) -> impl Iterator<Item = Option<Self::Parameter<'_>>> {
+                #[allow(non_snake_case)]
+                let ($($param,)*) = self;
+                $(
+                    #[allow(non_snake_case)]
+                    let mut $param = $param.iter();
+                )*
+                std::iter::from_fn(move || {
+                    $(
+                        #[allow(non_snake_case)]
+                        let $param = $param.next()?;
+                    )*
+                    $(
+                        #[allow(non_snake_case)]
+                        let Some($param) = $param else {
+                            return Some(None);
+                        };
+                    )*
+                    Some(Some(($($param,)*)))
+                })
             }
 
             fn iter_mut(&mut self) -> impl Iterator<Item = Option<Self::ParameterMut<'_>>> {

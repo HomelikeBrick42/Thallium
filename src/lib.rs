@@ -17,7 +17,6 @@ pub mod system_set;
 mod tests {
     use crate::{
         app::App,
-        entities::Entities,
         query::{Component, Query, Ref, RefMut},
         system_set::SystemSet,
     };
@@ -53,18 +52,11 @@ mod tests {
 
         let mut set = SystemSet::new();
         set.register_system(
-            |entities: Entities<'_>,
-             q: Query<
-                '_,
-                (
-                    Ref<TestComponent>,
-                    Option<(Ref<TestComponent2>, Ref<TestComponent>)>,
-                ),
-            >| {
-                for entity in entities.iter() {
-                    let (c, c2) = q.get(entity).unwrap();
+            |q1: Query<'_, Ref<TestComponent>>,
+             q2: Query<'_, Option<(Ref<TestComponent2>, Ref<TestComponent>)>>| {
+                for (entity, c) in q1.iter() {
                     assert_eq!(c.value, 43);
-                    if let Some((c2, c)) = c2 {
+                    if let Some((c2, c)) = q2.get(entity).unwrap() {
                         assert_eq!(c2.value, 0);
                         assert_eq!(c.value, 43);
                     }
