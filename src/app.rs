@@ -47,7 +47,7 @@ impl App {
         let id = self.next_free_entity;
         if id < self.entities.len() {
             let generation = self.entities[id];
-            self.entities[id] = NonZeroUsize::new(generation.get() & !1usize).unwrap();
+            self.entities[id] = NonZeroUsize::new(generation.get() + 1).unwrap();
 
             while let Some(&generation) = self.entities.get(self.next_free_entity) {
                 self.next_free_entity += 1;
