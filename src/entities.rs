@@ -2,26 +2,31 @@ use crate::{
     system::{Borrow, RunState},
     system_parameters::SystemParameter,
 };
-use slotmap::SlotMap;
+use std::num::NonZeroUsize;
 
-slotmap::new_key_type! {
-    pub struct Entity;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Entity {
+    pub(crate) id: usize,
+    pub(crate) generation: NonZeroUsize,
 }
 
 #[derive(Clone, Copy)]
 pub struct Entities<'a> {
-    entities: &'a SlotMap<Entity, ()>,
+    entities: &'a Vec<NonZeroUsize>,
 }
 
 impl<'a> Entities<'a> {
     pub fn iter(&self) -> impl ExactSizeIterator<Item = Entity> + 'a {
-        self.entities.keys()
+        self.entities
+            .iter()
+            .enumerate()
+            .map(|(id, &generation)| Entity { id, generation })
     }
 }
 
 impl<'a> SystemParameter for Entities<'a> {
     type This<'this> = Entities<'this>;
-    type Lock<'state> = &'state SlotMap<Entity, ()>;
+    type Lock<'state> = &'state Vec<NonZeroUsize>;
 
     fn lock(state: RunState<'_>) -> Self::Lock<'_> {
         state.entities

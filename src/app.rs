@@ -6,12 +6,12 @@ use crate::{
 };
 use hashbrown::HashMap;
 use parking_lot::RwLock;
-use slotmap::SlotMap;
-use std::{any::TypeId, marker::PhantomData};
+use std::{any::TypeId, marker::PhantomData, num::NonZeroUsize};
 
 pub struct App {
     resources: ResourceMap,
-    entities: SlotMap<Entity, ()>,
+    next_free_entity: usize,
+    entities: Vec<NonZeroUsize>,
     components: ComponentMap,
 }
 
@@ -19,7 +19,8 @@ impl App {
     pub fn new() -> Self {
         Self {
             resources: HashMap::new(),
-            entities: SlotMap::with_key(),
+            next_free_entity: 0,
+            entities: Vec::new(),
             components: HashMap::new(),
         }
     }
@@ -42,18 +43,46 @@ impl App {
     }
 
     pub fn create_entity(&mut self) -> Entity {
-        self.entities.insert(())
+        let id = self.next_free_entity;
+        if id < self.entities.len() {
+            let generation = self.entities[id];
+            self.entities[id] = NonZeroUsize::new(generation.get() & !1usize).unwrap();
+
+            while let Some(&generation) = self.entities.get(self.next_free_entity) {
+                self.next_free_entity += 1;
+                if generation.get() & 1 != 0 {
+                    break;
+                }
+            }
+
+            Entity { id, generation }
+        } else {
+            const NEW_GENERATION: NonZeroUsize = match NonZeroUsize::new(2) {
+                Some(generation) => generation,
+                None => unreachable!(),
+            };
+
+            self.entities.push(NEW_GENERATION);
+            self.next_free_entity = self.entities.len();
+            Entity {
+                id,
+                generation: NEW_GENERATION,
+            }
+        }
     }
 
     pub fn destroy_entity(&mut self, entity: Entity) {
-        self.entities.remove(entity);
+        if self.entities.get(entity.id) == Some(&entity.generation) {
+            self.entities[entity.id] |= NonZeroUsize::MIN;
+            if self.next_free_entity > entity.id {}
+        }
     }
 
     pub fn add_component<C>(&mut self, entity: Entity, component: C)
     where
         C: Component,
     {
-        if !self.entities.contains_key(entity) {
+        if self.entities.get(entity.id) != Some(&entity.generation) {
             return;
         }
 
@@ -70,10 +99,6 @@ impl App {
     where
         C: Component,
     {
-        if !self.entities.contains_key(entity) {
-            return None;
-        }
-
         self.components
             .get_mut(&TypeId::of::<C>())?
             .get_mut()

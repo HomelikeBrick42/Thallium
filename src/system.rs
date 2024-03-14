@@ -1,19 +1,81 @@
-use crate::{entities::Entity, system_parameters::SystemParameter};
+use crate::{entities::Entity, query::Component, system_parameters::SystemParameter};
 use hashbrown::HashMap;
 use parking_lot::RwLock;
-use slotmap::{SecondaryMap, SlotMap};
 use std::{
     any::{Any, TypeId},
     marker::PhantomData,
+    num::NonZeroUsize,
 };
 
 pub(crate) type ResourceMap = HashMap<TypeId, RwLock<Box<dyn Any + Send + Sync>>>;
 pub(crate) type ComponentMap = HashMap<TypeId, RwLock<Box<dyn Any + Send + Sync>>>;
-pub(crate) type ComponentContainer<T> = SecondaryMap<Entity, T>;
+
+pub struct ComponentContainer<C>
+where
+    C: Component,
+{
+    pub(crate) components: Vec<Option<(NonZeroUsize, C)>>,
+}
+
+impl<C> ComponentContainer<C>
+where
+    C: Component,
+{
+    pub(crate) fn new() -> Self {
+        Self {
+            components: Vec::new(),
+        }
+    }
+
+    pub(crate) fn insert(&mut self, entity: Entity, component: C) {
+        if entity.id >= self.components.len() {
+            self.components.resize_with(entity.id + 1, || None);
+        }
+        self.components[entity.id] = Some((entity.generation, component));
+    }
+
+    pub(crate) fn remove(&mut self, entity: Entity) -> Option<C> {
+        if let Some(&Some((generation, _))) = self.components.get(entity.id) {
+            if generation == entity.generation {
+                return self.components[entity.id]
+                    .take()
+                    .map(|(_, component)| component);
+            }
+        }
+        None
+    }
+
+    pub(crate) fn get(&self, entity: Entity) -> Option<&C> {
+        self.components
+            .get(entity.id)
+            .and_then(|slot| slot.as_ref())
+            .and_then(|&(generation, ref component)| {
+                (generation == entity.generation).then_some(component)
+            })
+    }
+
+    pub(crate) fn get_mut(&mut self, entity: Entity) -> Option<&mut C> {
+        self.components
+            .get_mut(entity.id)
+            .and_then(|slot| slot.as_mut())
+            .and_then(|&mut (generation, ref mut component)| {
+                (generation == entity.generation).then_some(component)
+            })
+    }
+
+    pub(crate) fn get_many_mut<const N: usize>(
+        &mut self,
+        entities: [Entity; N],
+    ) -> Option<[&mut C; N]> {
+        _ = entities;
+        Some(std::array::from_fn(|_| todo!()))
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct RunState<'a> {
     pub(crate) resources: &'a ResourceMap,
-    pub(crate) entities: &'a SlotMap<Entity, ()>,
+    pub(crate) entities: &'a Vec<NonZeroUsize>,
     pub(crate) components: &'a ComponentMap,
 }
 
