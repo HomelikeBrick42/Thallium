@@ -1,4 +1,4 @@
-use crate::{component::Component, entities::Entity};
+use crate::{Component, Entity};
 use std::{any::Any, num::NonZeroUsize};
 
 pub(crate) trait DynComponentContainer: Send + Sync {

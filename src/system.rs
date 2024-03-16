@@ -1,6 +1,4 @@
-use crate::{
-    app::App, component_container::DynComponentContainer, system_parameters::SystemParameter,
-};
+use crate::{component_container::DynComponentContainer, App, SystemParameter};
 use hashbrown::{HashMap, HashSet};
 use parking_lot::RwLock;
 use std::{

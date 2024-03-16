@@ -1,4 +1,7 @@
-use crate::system::{Borrow, BorrowType, RunState, System, SystemFunction, SystemWrapper};
+use crate::{
+    system::{Borrow, BorrowType, RunState},
+    System, SystemFunction, SystemWrapper,
+};
 use hashbrown::HashMap;
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use std::{any::TypeId, marker::PhantomData};

@@ -1,8 +1,9 @@
+use std::num::NonZeroUsize;
+
 use crate::{
     system::{Borrow, EntityMap, RunState},
-    system_parameters::SystemParameter,
+    SystemParameter,
 };
-use std::num::NonZeroUsize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Entity {

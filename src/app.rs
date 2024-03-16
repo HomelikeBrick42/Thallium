@@ -1,9 +1,7 @@
 use crate::{
-    component::Component,
     component_container::ComponentContainer,
-    entities::Entity,
-    resource::Resource,
-    system::{ComponentMap, EntityMap, ResourceMap, RunState, System, SystemWrapper},
+    system::{ComponentMap, EntityMap, ResourceMap, RunState},
+    Component, Entity, Resource, System, SystemWrapper,
 };
 use hashbrown::{HashMap, HashSet};
 use parking_lot::RwLock;

@@ -1,10 +1,8 @@
 use crate::{
-    component::Component,
     component_container::ComponentContainer,
-    entities::Entity,
-    query_parameters::{OptionalComponentContainer, QueryParameter},
+    query_parameters::OptionalComponentContainer,
     system::{Borrow, EntityMap, RunState},
-    system_parameters::SystemParameter,
+    Component, Entity, QueryParameter, SystemParameter,
 };
 use std::marker::PhantomData;
 

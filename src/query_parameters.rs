@@ -1,8 +1,8 @@
 use crate::{
-    component::Component,
     component_container::ComponentContainer,
-    query::{ComponentContainerTrait, Ref, RefMut},
+    query::ComponentContainerTrait,
     system::{Borrow, BorrowType, RunState},
+    Component, Ref, RefMut,
 };
 use parking_lot::{
     MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLockReadGuard, RwLockWriteGuard,

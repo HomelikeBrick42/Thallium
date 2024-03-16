@@ -3,17 +3,28 @@
 #![deny(elided_lifetimes_in_paths)]
 #![allow(clippy::type_complexity)]
 
-pub mod app;
-pub mod commands;
-pub mod component;
-pub mod component_container;
-pub mod entities;
-pub mod query;
-pub mod query_parameters;
-pub mod resource;
-pub mod system;
-pub mod system_parameters;
-pub mod system_set;
+mod app;
+mod commands;
+mod component;
+mod component_container;
+mod entities;
+mod query;
+mod query_parameters;
+mod resource;
+mod system;
+mod system_parameters;
+mod system_set;
+
+pub use app::App;
+pub use commands::Commands;
+pub use component::Component;
+pub use entities::{Entities, Entity};
+pub use query::{Query, Ref, RefMut};
+pub use query_parameters::QueryParameter;
+pub use resource::{Res, ResMut, Resource};
+pub use system::{System, SystemFunction, SystemWrapper};
+pub use system_parameters::SystemParameter;
+pub use system_set::SystemSet;
 
 #[cfg(test)]
 mod tests {
