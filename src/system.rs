@@ -1,12 +1,13 @@
 use crate::{component_container::DynComponentContainer, App, SystemParameter};
-use hashbrown::{HashMap, HashSet};
 use parking_lot::RwLock;
 use std::{
     any::{Any, TypeId},
+    collections::{HashMap, HashSet},
     marker::PhantomData,
     num::NonZeroUsize,
     sync::mpsc::Sender,
 };
+
 
 pub(crate) type ResourceMap = HashMap<TypeId, RwLock<Box<dyn Any + Send + Sync>>>;
 pub(crate) type EntityMap = Vec<(NonZeroUsize, HashSet<TypeId>)>;

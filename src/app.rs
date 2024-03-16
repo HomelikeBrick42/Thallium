@@ -3,9 +3,13 @@ use crate::{
     system::{ComponentMap, EntityMap, ResourceMap, RunState},
     Component, Entity, Resource, System, SystemWrapper,
 };
-use hashbrown::{HashMap, HashSet};
 use parking_lot::RwLock;
-use std::{any::TypeId, marker::PhantomData, num::NonZeroUsize};
+use std::{
+    any::TypeId,
+    collections::{HashMap, HashSet},
+    marker::PhantomData,
+    num::NonZeroUsize,
+};
 
 pub struct App {
     resources: ResourceMap,

@@ -2,9 +2,8 @@ use crate::{
     system::{Borrow, BorrowType, RunState},
     System, SystemFunction, SystemWrapper,
 };
-use hashbrown::HashMap;
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
-use std::{any::TypeId, marker::PhantomData};
+use std::{any::TypeId, collections::HashMap, marker::PhantomData};
 
 pub(crate) struct SystemGroup<'a> {
     resources: HashMap<TypeId, Borrow>,
