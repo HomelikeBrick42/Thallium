@@ -1,6 +1,7 @@
 use crate::{
+    component::Component,
     component_container::ComponentContainer,
-    query::{Component, ComponentContainerTrait, Ref, RefMut},
+    query::{ComponentContainerTrait, Ref, RefMut},
     system::{Borrow, BorrowType, RunState},
 };
 use parking_lot::{

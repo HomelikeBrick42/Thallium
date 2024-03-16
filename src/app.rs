@@ -1,7 +1,7 @@
 use crate::{
+    component::Component,
     component_container::ComponentContainer,
     entities::Entity,
-    query::Component,
     resource::Resource,
     system::{ComponentMap, EntityMap, ResourceMap, RunState, System, SystemWrapper},
 };
@@ -132,11 +132,17 @@ impl App {
     where
         SystemWrapper<S, Marker>: System,
     {
+        let (command_sender, command_receiver) = std::sync::mpsc::channel();
         SystemWrapper(system, PhantomData).run(RunState {
             resources: &self.resources,
             entities: &self.entities,
             components: &self.components,
+            command_sender: &command_sender,
         });
+        drop(command_sender);
+        for command in command_receiver {
+            command(self);
+        }
     }
 }
 

@@ -4,6 +4,8 @@
 #![allow(clippy::type_complexity)]
 
 pub mod app;
+pub mod commands;
+pub mod component;
 pub mod component_container;
 pub mod entities;
 pub mod query;
@@ -17,7 +19,10 @@ pub mod system_set;
 mod tests {
     use crate::{
         app::App,
-        query::{Component, Query, Ref, RefMut},
+        commands::Commands,
+        component::Component,
+        entities::Entities,
+        query::{Query, Ref, RefMut},
         system_set::SystemSet,
     };
 
@@ -64,5 +69,21 @@ mod tests {
             },
         );
         app.run(&mut set);
+
+        app.run(|mut commands: Commands<'_>| {
+            commands.create_entity(());
+            commands.create_entity(TestComponent { value: 5 });
+        });
+
+        app.run(|entities: Entities<'_>, q: Query<'_, Ref<TestComponent>>| {
+            assert_eq!(entities.iter().count(), 4);
+            assert_eq!(
+                entities
+                    .iter()
+                    .filter(|&entity| q.get(entity).is_some())
+                    .count(),
+                3
+            );
+        });
     }
 }

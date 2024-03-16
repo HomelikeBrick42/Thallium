@@ -1,4 +1,5 @@
 use crate::{
+    component::Component,
     component_container::ComponentContainer,
     entities::Entity,
     query_parameters::{OptionalComponentContainer, QueryParameter},
@@ -6,8 +7,6 @@ use crate::{
     system_parameters::SystemParameter,
 };
 use std::marker::PhantomData;
-
-pub trait Component: Sized + Send + Sync + 'static {}
 
 pub struct Ref<C>(PhantomData<fn() -> C>)
 where

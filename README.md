@@ -11,8 +11,9 @@ A basic ECS that ive been working on
 ```rust
 use thallium_ecs::{
     app::App,
+    component::Component,
     entities::Entities,
-    query::{Component, Query, Ref, RefMut},
+    query::{Query, Ref, RefMut},
     system_set::SystemSet,
 };
 
