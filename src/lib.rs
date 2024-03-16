@@ -1,5 +1,5 @@
 #![doc = include_str!("../README.md")]
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 #![deny(elided_lifetimes_in_paths)]
 #![allow(clippy::type_complexity)]
 

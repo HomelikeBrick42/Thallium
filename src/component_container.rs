@@ -97,36 +97,53 @@ where
             })
     }
 
+    #[allow(unsafe_code)]
     pub(crate) fn get_many_mut<const N: usize>(
         &mut self,
-        mut entities: [Entity; N],
+        entities: [Entity; N],
     ) -> Option<[&mut C; N]> {
-        entities.sort_unstable();
-
-        // Make sure all entities are referencing valid components
+        // check that there are no invalid entities
         {
-            let mut previous_entity_id = usize::MAX;
-            for entity in entities {
-                if entity.id == previous_entity_id {
-                    return None;
+            let mut i = 0;
+            while i < entities.len() {
+                let entity = entities[i];
+                if entities[i].id >= self.components.len() {
+                    break;
                 }
-                if self.components.get(entity.id)?.as_ref()?.0 != entity.generation {
-                    return None;
+                if !self.components[entity.id]
+                    .as_ref()
+                    .map_or(false, |&(generation, _)| generation == entity.generation)
+                {
+                    break;
                 }
-                previous_entity_id = entity.id;
+
+                unsafe {
+                    self.components[entity.id].as_mut().unwrap_unchecked().0 |= NonZeroUsize::MIN;
+                }
+
+                i += 1;
+            }
+
+            for &entity in &entities[..i] {
+                unsafe {
+                    let generation = &mut self.components[entity.id].as_mut().unwrap_unchecked().0;
+                    *generation = NonZeroUsize::new_unchecked(generation.get() & !1usize);
+                }
+            }
+
+            if i != entities.len() {
+                return None;
             }
         }
 
-        let mut previous_id = 0;
-        let mut components = self.components.as_mut_slice();
-        Some(entities.map(|entity| {
-            let (component, rest) = std::mem::take(&mut components)
-                [entity.id.saturating_sub(previous_id + 1)..]
-                .split_first_mut()
-                .unwrap();
-            components = rest;
-            previous_id = entity.id;
-            &mut component.as_mut().unwrap().1
-        }))
+        unsafe {
+            let components_ptr = self.components.as_mut_ptr();
+            Some(entities.map(|entity| {
+                &mut (*components_ptr.add(entity.id))
+                    .as_mut()
+                    .unwrap_unchecked()
+                    .1
+            }))
+        }
     }
 }
