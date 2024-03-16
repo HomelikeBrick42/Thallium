@@ -117,6 +117,7 @@ where
                     break;
                 }
 
+                // an odd generation number signals that its invalid, so later iterations cant see that this component is valid
                 unsafe {
                     self.components[entity.id].as_mut().unwrap_unchecked().0 |= NonZeroUsize::MIN;
                 }
@@ -124,6 +125,7 @@ where
                 i += 1;
             }
 
+            // unset all the modified components to make them valid again
             for &entity in &entities[..i] {
                 unsafe {
                     let generation = &mut self.components[entity.id].as_mut().unwrap_unchecked().0;
