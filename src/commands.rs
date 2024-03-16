@@ -1,4 +1,5 @@
 use crate::{
+    app::App,
     component::ComponentBundle,
     entities::Entity,
     system::{CommandSender, RunState},
@@ -43,6 +44,12 @@ impl Commands<'_> {
     {
         self.command_sender
             .send(Box::new(move |app| B::remove(app, entity)))
+            .unwrap();
+    }
+
+    pub fn schedule(&mut self, f: impl FnOnce(&mut App) + Send + 'static) {
+        self.command_sender
+            .send(Box::new(move |app| f(app)))
             .unwrap();
     }
 }
