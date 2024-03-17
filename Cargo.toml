@@ -11,4 +11,14 @@ repository = "https://github.com/HomelikeBrick42/ThalliumECS"
 members = ["crates/*"]
 
 [dependencies]
-thallium_ecs = { path = "crates/thallium_ecs" }
+thallium_ecs = { path = "crates/thallium_ecs", version = "0.4.0" }
+
+[workspace.lints.clippy]
+type_complexity = "allow"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints]
+workspace = true

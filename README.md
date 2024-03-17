@@ -1,15 +1,15 @@
-# `thallium_ecs`
+# `thallium`
 
-[![Latest Version](https://img.shields.io/crates/v/thallium_ecs.svg)](https://crates.io/crates/thallium_ecs)
-[![Rust Documentation](https://docs.rs/thallium_ecs/badge.svg)](https://docs.rs/thallium_ecs)
+[![Latest Version](https://img.shields.io/crates/v/thallium.svg)](https://crates.io/crates/thallium)
+[![Rust Documentation](https://docs.rs/thallium/badge.svg)](https://docs.rs/thallium)
 ![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)
 
-A basic ECS that ive been working on
+A basic game engine that ive been working on
 
 ## Example code
 
 ```rust
-use thallium_ecs::{App, Component, Entities, Query, Ref, RefMut, SystemSet};
+use thallium::ecs::{App, Component, Entities, Query, Ref, RefMut, SystemSet};
 
 struct Person {
     name: String,
