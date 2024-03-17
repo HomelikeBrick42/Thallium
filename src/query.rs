@@ -1,7 +1,8 @@
 use crate::{
     component_container::ComponentContainer,
+    entities::EntityMap,
     query_parameters::OptionalComponentContainer,
-    system::{Borrow, EntityMap, RunState},
+    system::{Borrow, RunState},
     Component, Entity, QueryParameter, SystemParameter,
 };
 use std::marker::PhantomData;
@@ -86,10 +87,8 @@ where
     > + 'b {
         self.entities
             .iter()
-            .enumerate()
-            .map(|(id, &(generation, _))| Entity { id, generation })
             .zip(self.container.iter())
-            .filter_map(|(entity, parameter)| parameter.map(|parameter| (entity, parameter)))
+            .filter_map(|(entity, parameter)| entity.zip(parameter))
     }
 
     pub fn iter_mut<'b>(
@@ -102,10 +101,8 @@ where
     > + 'b {
         self.entities
             .iter()
-            .enumerate()
-            .map(|(id, &(generation, _))| Entity { id, generation })
             .zip(self.container.iter_mut())
-            .filter_map(|(entity, parameter)| parameter.map(|parameter| (entity, parameter)))
+            .filter_map(|(entity, parameter)| entity.zip(parameter))
     }
 }
 
