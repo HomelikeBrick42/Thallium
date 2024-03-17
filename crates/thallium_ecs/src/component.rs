@@ -1,5 +1,6 @@
 use crate::{App, Entity};
 
+/// The trait implemented for all types that are used as components
 pub trait Component: Sized + Send + Sync + 'static {}
 
 pub trait ComponentBundle: Sized + Send + Sync + 'static {

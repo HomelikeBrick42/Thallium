@@ -7,14 +7,17 @@ use crate::{
 };
 use std::marker::PhantomData;
 
+/// The [`QueryParameter`] for getting a reference to a [`Component`]
 pub struct Ref<C>(PhantomData<fn() -> C>)
 where
     C: Component;
 
+/// The [`QueryParameter`] for getting a mutable reference to a [`Component`]
 pub struct RefMut<C>(PhantomData<fn() -> C>)
 where
     C: Component;
 
+/// A [`SystemParameter`] that lets you get references to [`Component`]s specified in `Q`
 pub struct Query<'a, Q>
 where
     Q: QueryParameter,
@@ -55,6 +58,7 @@ impl<'a, Q> Query<'a, Q>
 where
     Q: QueryParameter,
 {
+    /// Gets access to the [`Component`]s that are attached to `entity`
     pub fn get<'b>(
         &'b self,
         entity: Entity,
@@ -62,6 +66,7 @@ where
         self.container.get(entity)
     }
 
+    /// Gets mutable access to the [`Component`]s that are attached to `entity`
     pub fn get_mut<'b>(
         &'b mut self,
         entity: Entity,
@@ -69,6 +74,7 @@ where
         self.container.get_mut(entity)
     }
 
+    /// Semantically the same as calling [`Query::get_mut`] multiple times for each [`Entity`] in the `entities` array, also returns [`None`] if there are any duplicates in `entities`
     pub fn get_many_mut<'b, const N: usize>(
         &'b mut self,
         entities: [Entity; N],
@@ -77,6 +83,7 @@ where
         self.container.get_many_mut(entities)
     }
 
+    /// Returns an iterator over all the [`Component`]s, also gives the [`Entity`] that the [`Component`]s are attached to
     pub fn iter<'b>(
         &'b self,
     ) -> impl Iterator<
@@ -91,6 +98,7 @@ where
             .filter_map(|(entity, parameter)| entity.zip(parameter))
     }
 
+    /// Returns a mutable iterator over all the [`Component`]s, also gives the [`Entity`] that the [`Component`]s are attached to
     pub fn iter_mut<'b>(
         &'b mut self,
     ) -> impl Iterator<

@@ -1,7 +1,10 @@
+#![doc = include_str!("../README.md")]
+
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
 
+/// Derives the [`Component`](thallium_ecs::Component) trait
 #[proc_macro_derive(Component)]
 pub fn derive_component(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -16,6 +19,7 @@ pub fn derive_component(input: TokenStream) -> TokenStream {
     .into()
 }
 
+/// Derives the [`Resource`](thallium_ecs::Resource) trait
 #[proc_macro_derive(Resource)]
 pub fn derive_resource(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);

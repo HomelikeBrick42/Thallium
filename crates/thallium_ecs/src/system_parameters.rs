@@ -1,12 +1,19 @@
 use crate::system::{Borrow, RunState};
 
+/// The trait for parameters to [`SystemFunction`](crate::SystemFunction)s
 pub trait SystemParameter: Send + Sync {
+    /// The type that this trait is implemented on, but with a different lifetime
     type This<'this>;
+    /// The lock returned by [`SystemParameter::lock`]
     type Lock<'state>;
 
+    /// Locks any state required for this [`SystemParameter`]
     fn lock(state: RunState<'_>) -> Self::Lock<'_>;
+    /// Constructs the [`SystemParameter`] from a lock
     fn construct<'this>(state: &'this mut Self::Lock<'_>) -> Self::This<'this>;
+    /// Returns an iterator over all [`Resource`](crate::Resource) types that this system parameter will lock
     fn get_resource_types() -> impl Iterator<Item = Borrow>;
+    /// Returns an iterator over all [`Component`](crate::Component) types that this system parameter will lock
     fn get_component_types() -> impl Iterator<Item = Borrow>;
 }
 

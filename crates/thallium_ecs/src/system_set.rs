@@ -11,17 +11,20 @@ pub(crate) struct SystemGroup<'a> {
     systems: Vec<Box<dyn System + 'a>>,
 }
 
+/// A set of [`System`]s that can be run in parallel
 pub struct SystemSet<'a> {
     system_groups: Vec<SystemGroup<'a>>,
 }
 
 impl<'a> SystemSet<'a> {
+    /// Constructs an empty [`SystemSet`]
     pub fn new() -> Self {
         SystemSet {
             system_groups: Vec::new(),
         }
     }
 
+    /// Registers a [`System`] with this [`SystemSet`]
     pub fn register_system<S, Marker>(&mut self, system: S)
     where
         SystemWrapper<S, Marker>: System + 'a,

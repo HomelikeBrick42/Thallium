@@ -1,6 +1,6 @@
 [package]
 name = "thallium"
-version = "0.4.2"
+version = "0.4.3"
 edition = "2021"
 description = "A basic game engine"
 exclude = ["crates/"]
@@ -11,8 +11,8 @@ repository = "https://github.com/HomelikeBrick42/Thallium"
 members = ["crates/*"]
 
 [dependencies]
-thallium_ecs = { path = "crates/thallium_ecs", version = "0.4.1" }
-thallium_derive = { path = "crates/thallium_derive", version = "0.1.0" }
+thallium_ecs = { path = "crates/thallium_ecs", version = "0.4.2" }
+thallium_derive = { path = "crates/thallium_derive", version = "0.1.1" }
 
 [workspace.lints.clippy]
 type_complexity = "allow"
@@ -20,6 +20,7 @@ type_complexity = "allow"
 [workspace.lints.rust]
 unsafe_code = "deny"
 unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
 
 [lints]
 workspace = true

@@ -9,14 +9,21 @@ use parking_lot::{
 };
 use std::any::TypeId;
 
+/// The type parameter for a [`Query`](crate::Query)
 pub trait QueryParameter {
+    /// The lock returned from [`QueryParameter::lock`]
     type ComponentContainerLock<'a>;
+    /// The component container that is used to get [`Component`]s from
     type ComponentContainer<'a>: ComponentContainerTrait<'a>;
 
+    /// Locks any needed state, the first step to creating a [`Query`](crate::Query)
     fn lock(state: RunState<'_>) -> Self::ComponentContainerLock<'_>;
+    /// Constructs the component container from the locked state, the final state to creating a [`Query`](crate::Query)
     fn construct<'a>(
         lock: &'a mut Self::ComponentContainerLock<'_>,
     ) -> Self::ComponentContainer<'a>;
+
+    /// Returns an iterator over all the [`Component`] types that will be locked
     fn get_component_types() -> impl Iterator<Item = Borrow>;
 }
 

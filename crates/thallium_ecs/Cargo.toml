@@ -1,8 +1,8 @@
 [package]
 name = "thallium_ecs"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2021"
-description = "A basic ECS"
+description = "The ECS for the thallium crate"
 license = "MIT"
 repository = "https://github.com/HomelikeBrick42/Thallium"
 
