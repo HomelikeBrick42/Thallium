@@ -11,11 +11,11 @@ A basic game engine that ive been working on
 ```rust
 use thallium::ecs::{App, Component, Entities, Query, Ref, RefMut, SystemSet};
 
+#[derive(Component)]
 struct Person {
     name: String,
     age: i32,
 }
-impl Component for Person {}
 
 let mut app = App::new();
 

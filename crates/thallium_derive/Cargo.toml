@@ -6,7 +6,12 @@ description = "The derive macros for the thallium crate"
 license = "MIT"
 repository = "https://github.com/HomelikeBrick42/Thallium"
 
+[lib]
+proc-macro = true
+
 [dependencies]
+quote = "1.0.35"
+syn = "2.0.53"
 
 [lints]
 workspace = true
