@@ -1,6 +1,6 @@
 [package]
 name = "thallium_derive"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "The derive macros for the thallium crate"
 license = "MIT"
@@ -10,7 +10,7 @@ repository = "https://github.com/HomelikeBrick42/Thallium"
 proc-macro = true
 
 [dependencies]
-thallium_ecs = { path = "../thallium_ecs", version = "0.4.2" }
+thallium_ecs = { path = "../thallium_ecs", version = "0.5.0" }
 quote = "1.0.35"
 syn = "2.0.53"
 
