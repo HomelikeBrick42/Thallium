@@ -2,10 +2,10 @@ use crate::{
     component_container::ComponentContainer,
     entities::EntityMap,
     system::{ComponentMap, ResourceMap, RunState},
-    Component, Entity, Resource, System, SystemWrapper,
+    Component, Entity, IntoSystem, Resource, System,
 };
 use parking_lot::RwLock;
-use std::{any::TypeId, collections::HashMap, marker::PhantomData};
+use std::{any::TypeId, collections::HashMap};
 
 /// The main struct that you will create for holding entities, components, and resources
 pub struct App {
@@ -106,10 +106,10 @@ impl App {
     /// Runs a system with access to the [`App`]
     pub fn run<S, Marker>(&mut self, system: S)
     where
-        SystemWrapper<S, Marker>: System,
+        S: IntoSystem<Marker>,
     {
         let (command_sender, command_receiver) = std::sync::mpsc::channel();
-        SystemWrapper(system, PhantomData).run(&RunState {
+        system.into_system().run(&RunState {
             resources: &self.resources,
             entities: &self.entities,
             components: &self.components,

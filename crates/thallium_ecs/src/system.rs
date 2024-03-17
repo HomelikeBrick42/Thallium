@@ -38,26 +38,66 @@ pub struct Borrow {
 pub trait System: Send + Sync {
     /// Runs the system
     fn run(&mut self, state: &RunState<'_>);
+    /// Returns an iterator over all [`Resource`](crate::Resource) types that this [`System`] will use
+    fn get_resource_types(&self) -> impl Iterator<Item = Borrow> + '_
+    where
+        Self: Sized;
+    /// Returns an iterator over all [`Component`](crate::Component) types that this [`System`] will use
+    fn get_component_types(&self) -> impl Iterator<Item = Borrow> + '_
+    where
+        Self: Sized;
 }
 
-/// A wrapper that turns a [`SystemFunction`] into a [`System`]
-pub struct SystemWrapper<F, Marker>(pub(crate) F, pub(crate) PhantomData<fn(Marker)>);
-impl<F, Marker> System for SystemWrapper<F, Marker>
+/// Trait for converting things into a [`System`]
+pub trait IntoSystem<Marker> {
+    /// The type returned from [`IntoSystem::into_system`]
+    type System: System;
+
+    /// Converts `self` into a [`System`]
+    fn into_system(self) -> Self::System;
+}
+
+pub struct SystemFunctionWrapper<F, Marker>(pub(crate) F, pub(crate) PhantomData<fn(Marker)>)
+where
+    F: SystemFunction<Marker>;
+impl<F, Marker> System for SystemFunctionWrapper<F, Marker>
 where
     F: SystemFunction<Marker>,
 {
     fn run(&mut self, state: &RunState<'_>) {
-        SystemFunction::run(&mut self.0, state);
+        F::run(&mut self.0, state);
+    }
+
+    fn get_resource_types(&self) -> impl Iterator<Item = Borrow> + '_
+    where
+        Self: Sized,
+    {
+        F::get_resource_types()
+    }
+
+    fn get_component_types(&self) -> impl Iterator<Item = Borrow> + '_
+    where
+        Self: Sized,
+    {
+        F::get_component_types()
     }
 }
 
-/// The trait for functions that can be used as [`System`]s (after being wrapped in a [`SystemWrapper`])
+impl<F, Marker> IntoSystem<Marker> for F
+where
+    F: SystemFunction<Marker>,
+{
+    type System = SystemFunctionWrapper<F, Marker>;
+
+    fn into_system(self) -> Self::System {
+        SystemFunctionWrapper(self, PhantomData)
+    }
+}
+
 pub trait SystemFunction<Marker>: Send + Sync {
     /// Runs the system
     fn run(&mut self, state: &RunState<'_>);
-    /// Returns an iterator over all [`Resource`](crate::Resource) types that this system function will use
     fn get_resource_types() -> impl Iterator<Item = Borrow>;
-    /// Returns an iterator over all [`Component`](crate::Component) types that this system function will use
     fn get_component_types() -> impl Iterator<Item = Borrow>;
 }
 

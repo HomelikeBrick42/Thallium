@@ -19,6 +19,6 @@ pub use entities::{Entities, Entity};
 pub use query::{Query, Ref, RefMut};
 pub use query_parameters::QueryParameter;
 pub use resource::{Res, ResMut, Resource};
-pub use system::{System, SystemFunction, SystemWrapper};
+pub use system::{IntoSystem, System};
 pub use system_parameters::SystemParameter;
 pub use system_set::SystemSet;
