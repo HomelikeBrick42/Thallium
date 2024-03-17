@@ -1,7 +1,12 @@
 #![doc = include_str!("../README.md")]
 
 pub mod ecs {
+    pub use thallium_derive::{Component, Resource};
     pub use thallium_ecs::*;
+}
+
+pub mod derive {
+    pub use thallium_derive::*;
 }
 
 #[cfg(test)]
@@ -10,15 +15,15 @@ mod tests {
 
     #[test]
     fn test() {
+        #[derive(Component)]
         struct TestComponent {
             value: i32,
         }
-        impl Component for TestComponent {}
 
+        #[derive(Component)]
         struct TestComponent2 {
             value: i32,
         }
-        impl Component for TestComponent2 {}
 
         let mut app = App::new();
 
