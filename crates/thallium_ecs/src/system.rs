@@ -33,10 +33,13 @@ pub struct Borrow {
     pub borrow_type: BorrowType,
 }
 
+/// An ECS system that can be added to a [`SystemSet`](crate::SystemSet)
 pub trait System: Send + Sync {
+    /// Runs the system
     fn run(&mut self, state: RunState<'_>);
 }
 
+/// A wrapper that turns a [`SystemFunction`] into a [`System`]
 pub struct SystemWrapper<F, Marker>(pub(crate) F, pub(crate) PhantomData<fn(Marker)>);
 impl<F, Marker> System for SystemWrapper<F, Marker>
 where
@@ -47,9 +50,13 @@ where
     }
 }
 
+/// The trait for functions that can be used as [`System`]s (after being wrapped in a [`SystemWrapper`])
 pub trait SystemFunction<Marker>: Send + Sync {
+    /// Runs the system
     fn run(&mut self, state: RunState<'_>);
+    /// Returns an iterator over all [`Resource`](crate::Resource) types that this system function will use
     fn get_resource_types() -> impl Iterator<Item = Borrow>;
+    /// Returns an iterator over all [`Component`](crate::Component) types that this system function will use
     fn get_component_types() -> impl Iterator<Item = Borrow>;
 }
 

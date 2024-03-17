@@ -10,8 +10,10 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+/// The trait implemented for all types that will be used as resources
 pub trait Resource: Sized + Send + Sync + 'static {}
 
+/// The [`SystemParameter`] for getting a reference to a [`Resource`]
 pub struct Res<'a, T>
 where
     T: Resource,
@@ -103,6 +105,7 @@ where
     }
 }
 
+/// The [`SystemParameter`] for getting a mutable reference to a [`Resource`]
 pub struct ResMut<'a, T>
 where
     T: Resource,

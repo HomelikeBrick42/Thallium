@@ -4,6 +4,9 @@ use crate::{
 };
 use std::{any::TypeId, collections::HashSet, num::NonZeroUsize};
 
+/// A handle for components to be attached to
+///
+/// The behaviour of using an [`Entity`] with the wrong [`App`](crate::App) is unspecified but not UB
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Entity {
     pub(crate) id: usize,
@@ -97,16 +100,19 @@ impl Default for EntityMap {
     }
 }
 
+/// A [`SystemParameter`] for getting a list of all alive [`Entity`]s
 #[derive(Clone, Copy)]
 pub struct Entities<'a> {
     entities: &'a EntityMap,
 }
 
 impl<'a> Entities<'a> {
+    /// Checks if an [`Entity`] exists
     pub fn entity_exists(&self, entity: Entity) -> bool {
         self.entities.entity_exists(entity)
     }
 
+    /// Returns an iterator over all alive [`Entity`]s
     pub fn iter(&self) -> impl Iterator<Item = Entity> + 'a {
         self.entities.iter().flatten()
     }

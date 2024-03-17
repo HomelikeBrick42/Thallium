@@ -162,7 +162,7 @@ dependencies = [
 
 [[package]]
 name = "thallium"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "thallium_derive",
  "thallium_ecs",
@@ -170,15 +170,16 @@ dependencies = [
 
 [[package]]
 name = "thallium_derive"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "quote",
  "syn",
+ "thallium_ecs",
 ]
 
 [[package]]
 name = "thallium_ecs"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "parking_lot",
  "rayon",
