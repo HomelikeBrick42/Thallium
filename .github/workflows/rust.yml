@@ -32,4 +32,5 @@ jobs:
           rustup override set nightly
           cargo miri setup
       - name: Test with Miri
-        run: MIRIFLAGS="-Zmiri-tree-borrows -Zmiri-ignore-leaks" cargo miri test
+        run: |
+          MIRIFLAGS="-Zmiri-tree-borrows -Zmiri-ignore-leaks" cargo miri test

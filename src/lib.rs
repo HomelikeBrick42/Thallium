@@ -1,41 +1,12 @@
 #![doc = include_str!("../README.md")]
-#![deny(unsafe_code)]
-#![deny(elided_lifetimes_in_paths)]
-#![allow(clippy::type_complexity)]
 
-mod app;
-mod commands;
-mod component;
-mod component_container;
-mod entities;
-mod query;
-mod query_parameters;
-mod resource;
-mod system;
-mod system_parameters;
-mod system_set;
-
-pub use app::App;
-pub use commands::Commands;
-pub use component::Component;
-pub use entities::{Entities, Entity};
-pub use query::{Query, Ref, RefMut};
-pub use query_parameters::QueryParameter;
-pub use resource::{Res, ResMut, Resource};
-pub use system::{System, SystemFunction, SystemWrapper};
-pub use system_parameters::SystemParameter;
-pub use system_set::SystemSet;
+pub mod ecs {
+    pub use thallium_ecs::*;
+}
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        app::App,
-        commands::Commands,
-        component::Component,
-        entities::Entities,
-        query::{Query, Ref, RefMut},
-        system_set::SystemSet,
-    };
+    use crate::ecs::{App, Commands, Component, Entities, Query, Ref, RefMut, SystemSet};
 
     #[test]
     fn test() {
