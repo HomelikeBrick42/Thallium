@@ -9,13 +9,7 @@ A basic ECS that ive been working on
 ## Example code
 
 ```rust
-use thallium_ecs::{
-    app::App,
-    component::Component,
-    entities::Entities,
-    query::{Query, Ref, RefMut},
-    system_set::SystemSet,
-};
+use thallium_ecs::{App, Component, Entities, Query, Ref, RefMut, SystemSet};
 
 struct Person {
     name: String,

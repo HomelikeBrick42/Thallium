@@ -1,13 +1,100 @@
 use crate::{
-    system::{Borrow, EntityMap, RunState},
-    system_parameters::SystemParameter,
+    system::{Borrow, RunState},
+    SystemParameter,
 };
-use std::num::NonZeroUsize;
+use std::{any::TypeId, collections::HashSet, num::NonZeroUsize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Entity {
     pub(crate) id: usize,
     pub(crate) generation: NonZeroUsize,
+}
+
+pub struct EntityMap {
+    entities: Vec<(NonZeroUsize, HashSet<TypeId>)>,
+    next_free_entity: usize,
+}
+
+impl EntityMap {
+    pub(crate) fn new() -> Self {
+        Self {
+            entities: Vec::new(),
+            next_free_entity: 0,
+        }
+    }
+
+    pub(crate) fn create_entity(&mut self) -> Entity {
+        let id = self.next_free_entity;
+        if id < self.entities.len() {
+            let (generation, _) = self.entities[id];
+            let generation = NonZeroUsize::new(generation.get() + 1).unwrap();
+            self.entities[id].0 = generation;
+
+            while let Some(&(generation, _)) = self.entities.get(self.next_free_entity) {
+                self.next_free_entity += 1;
+                if generation.get() & 1 != 0 {
+                    break;
+                }
+            }
+
+            Entity { id, generation }
+        } else {
+            const NEW_GENERATION: NonZeroUsize = match NonZeroUsize::new(2) {
+                Some(generation) => generation,
+                None => unreachable!(),
+            };
+
+            self.entities.push((NEW_GENERATION, HashSet::new()));
+            self.next_free_entity = self.entities.len();
+            Entity {
+                id,
+                generation: NEW_GENERATION,
+            }
+        }
+    }
+
+    pub(crate) fn destroy_entity(&mut self, entity: Entity) -> Option<HashSet<TypeId>> {
+        if self.entity_exists(entity) {
+            self.entities[entity.id].0 |= NonZeroUsize::MIN;
+            if entity.id < self.next_free_entity {
+                self.next_free_entity = entity.id;
+            }
+            Some(std::mem::take(&mut self.entities[entity.id].1))
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn entity_exists(&self, entity: Entity) -> bool {
+        self.entities
+            .get(entity.id)
+            .map_or(false, |&(generation, _)| generation == entity.generation)
+    }
+
+    pub(crate) fn add_component(&mut self, entity: Entity, component_type: TypeId) {
+        debug_assert_eq!(self.entities[entity.id].0, entity.generation);
+        self.entities[entity.id].1.insert(component_type);
+    }
+
+    pub(crate) fn remove_component(&mut self, entity: Entity, component_type: TypeId) {
+        debug_assert_eq!(self.entities[entity.id].0, entity.generation);
+        self.entities[entity.id].1.remove(&component_type);
+    }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = Option<Entity>> + '_ {
+        self.entities
+            .iter()
+            .enumerate()
+            .map(|(id, &(generation, _))| {
+                (generation.get() & 1 == 0).then_some(Entity { id, generation })
+            })
+    }
+}
+
+impl Default for EntityMap {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -17,16 +104,11 @@ pub struct Entities<'a> {
 
 impl<'a> Entities<'a> {
     pub fn entity_exists(&self, entity: Entity) -> bool {
-        self.entities
-            .get(entity.id)
-            .map_or(false, |&(generation, _)| generation == entity.generation)
+        self.entities.entity_exists(entity)
     }
 
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = Entity> + 'a {
-        self.entities
-            .iter()
-            .enumerate()
-            .map(|(id, &(generation, _))| Entity { id, generation })
+    pub fn iter(&self) -> impl Iterator<Item = Entity> + 'a {
+        self.entities.iter().flatten()
     }
 }
 

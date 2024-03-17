@@ -1,4 +1,4 @@
-use crate::{app::App, entities::Entity};
+use crate::{App, Entity};
 
 pub trait Component: Sized + Send + Sync + 'static {}
 
