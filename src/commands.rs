@@ -1,9 +1,7 @@
 use crate::{
-    app::App,
     component::ComponentBundle,
-    entities::Entity,
     system::{CommandSender, RunState},
-    system_parameters::SystemParameter,
+    App, Entity, SystemParameter,
 };
 
 pub struct Commands<'a> {
