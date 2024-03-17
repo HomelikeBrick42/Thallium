@@ -185,12 +185,7 @@ impl<'a> System for SystemSet<'a> {
 
 impl<'a> System for &mut SystemSet<'a> {
     fn run(&mut self, state: &RunState<'_>) {
-        for system_group in &mut self.system_groups {
-            system_group
-                .systems
-                .par_iter_mut()
-                .for_each(|system| system.run(state));
-        }
+        SystemSet::run(self, state)
     }
 
     fn get_resource_types(&self) -> impl Iterator<Item = Borrow> + '_
