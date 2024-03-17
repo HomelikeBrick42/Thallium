@@ -33,7 +33,7 @@ where
     type This<'this> = Query<'this, Q>;
     type Lock<'state> = (&'state EntityMap, Q::ComponentContainerLock<'state>);
 
-    fn lock(state: RunState<'_>) -> Self::Lock<'_> {
+    fn lock<'state>(state: &RunState<'state>) -> Self::Lock<'state> {
         (state.entities, Q::lock(state))
     }
 

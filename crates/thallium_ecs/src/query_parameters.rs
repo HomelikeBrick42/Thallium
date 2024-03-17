@@ -17,7 +17,7 @@ pub trait QueryParameter {
     type ComponentContainer<'a>: ComponentContainerTrait<'a>;
 
     /// Locks any needed state, the first step to creating a [`Query`](crate::Query)
-    fn lock(state: RunState<'_>) -> Self::ComponentContainerLock<'_>;
+    fn lock<'a>(state: &RunState<'a>) -> Self::ComponentContainerLock<'a>;
     /// Constructs the component container from the locked state, the final state to creating a [`Query`](crate::Query)
     fn construct<'a>(
         lock: &'a mut Self::ComponentContainerLock<'_>,
@@ -34,7 +34,7 @@ where
     type ComponentContainerLock<'a> = Option<MappedRwLockReadGuard<'a, ComponentContainer<C>>>;
     type ComponentContainer<'a> = Option<&'a ComponentContainer<C>>;
 
-    fn lock(state: RunState<'_>) -> Self::ComponentContainerLock<'_> {
+    fn lock<'a>(state: &RunState<'a>) -> Self::ComponentContainerLock<'a> {
         Some(RwLockReadGuard::map(
             state
                 .components
@@ -67,7 +67,7 @@ where
     type ComponentContainerLock<'a> = Option<MappedRwLockWriteGuard<'a, ComponentContainer<C>>>;
     type ComponentContainer<'a> = Option<&'a mut ComponentContainer<C>>;
 
-    fn lock(state: RunState<'_>) -> Self::ComponentContainerLock<'_> {
+    fn lock<'a>(state: &RunState<'a>) -> Self::ComponentContainerLock<'a> {
         Some(RwLockWriteGuard::map(
             state
                 .components
@@ -102,7 +102,7 @@ where
     type ComponentContainerLock<'a> = P::ComponentContainerLock<'a>;
     type ComponentContainer<'a> = OptionalComponentContainer<P::ComponentContainer<'a>>;
 
-    fn lock(state: RunState<'_>) -> Self::ComponentContainerLock<'_> {
+    fn lock<'a>(state: &RunState<'a>) -> Self::ComponentContainerLock<'a> {
         P::lock(state)
     }
 
@@ -127,7 +127,7 @@ macro_rules! query_parameter_tuple {
             type ComponentContainer<'a> = ($($param::ComponentContainer<'a>,)*);
 
             #[allow(clippy::unused_unit)]
-            fn lock(state: RunState<'_>) -> Self::ComponentContainerLock<'_> {
+            fn lock<'a>(state: &RunState<'a>) -> Self::ComponentContainerLock<'a> {
                 _ = state;
                 ($($param::lock(state),)*)
             }

@@ -27,6 +27,7 @@ pub enum BorrowType {
     Mutable,
 }
 
+#[derive(Clone, Copy)]
 pub struct Borrow {
     pub id: TypeId,
     pub name: &'static str,
@@ -36,7 +37,7 @@ pub struct Borrow {
 /// An ECS system that can be added to a [`SystemSet`](crate::SystemSet)
 pub trait System: Send + Sync {
     /// Runs the system
-    fn run(&mut self, state: RunState<'_>);
+    fn run(&mut self, state: &RunState<'_>);
 }
 
 /// A wrapper that turns a [`SystemFunction`] into a [`System`]
@@ -45,7 +46,7 @@ impl<F, Marker> System for SystemWrapper<F, Marker>
 where
     F: SystemFunction<Marker>,
 {
-    fn run(&mut self, state: RunState<'_>) {
+    fn run(&mut self, state: &RunState<'_>) {
         SystemFunction::run(&mut self.0, state);
     }
 }
@@ -53,7 +54,7 @@ where
 /// The trait for functions that can be used as [`System`]s (after being wrapped in a [`SystemWrapper`])
 pub trait SystemFunction<Marker>: Send + Sync {
     /// Runs the system
-    fn run(&mut self, state: RunState<'_>);
+    fn run(&mut self, state: &RunState<'_>);
     /// Returns an iterator over all [`Resource`](crate::Resource) types that this system function will use
     fn get_resource_types() -> impl Iterator<Item = Borrow>;
     /// Returns an iterator over all [`Component`](crate::Component) types that this system function will use
@@ -67,7 +68,7 @@ macro_rules! system_function_impl {
             for<'a> Func: FnMut($($param),*) + FnMut($($param::This<'a>),*) + Send + Sync,
             $($param: SystemParameter,)*
         {
-            fn run(&mut self, state: RunState<'_>) {
+            fn run(&mut self, state: &RunState<'_>) {
                 _ = state;
                 $(
                     #[allow(non_snake_case)]

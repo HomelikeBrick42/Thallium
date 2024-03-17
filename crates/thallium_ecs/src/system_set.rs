@@ -124,7 +124,7 @@ impl<'a> Default for SystemSet<'a> {
 }
 
 impl<'a> System for SystemWrapper<SystemSet<'a>, ()> {
-    fn run(&mut self, state: RunState<'_>) {
+    fn run(&mut self, state: &RunState<'_>) {
         for system_group in &mut self.0.system_groups {
             system_group
                 .systems
@@ -135,7 +135,7 @@ impl<'a> System for SystemWrapper<SystemSet<'a>, ()> {
 }
 
 impl<'a> System for SystemWrapper<&mut SystemSet<'a>, ()> {
-    fn run(&mut self, state: RunState<'_>) {
+    fn run(&mut self, state: &RunState<'_>) {
         for system_group in &mut self.0.system_groups {
             system_group
                 .systems

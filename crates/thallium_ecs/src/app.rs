@@ -109,7 +109,7 @@ impl App {
         SystemWrapper<S, Marker>: System,
     {
         let (command_sender, command_receiver) = std::sync::mpsc::channel();
-        SystemWrapper(system, PhantomData).run(RunState {
+        SystemWrapper(system, PhantomData).run(&RunState {
             resources: &self.resources,
             entities: &self.entities,
             components: &self.components,

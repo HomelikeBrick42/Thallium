@@ -8,7 +8,7 @@ pub trait SystemParameter: Send + Sync {
     type Lock<'state>;
 
     /// Locks any state required for this [`SystemParameter`]
-    fn lock(state: RunState<'_>) -> Self::Lock<'_>;
+    fn lock<'state>(state: &RunState<'state>) -> Self::Lock<'state>;
     /// Constructs the [`SystemParameter`] from a lock
     fn construct<'this>(state: &'this mut Self::Lock<'_>) -> Self::This<'this>;
     /// Returns an iterator over all [`Resource`](crate::Resource) types that this system parameter will lock
@@ -27,7 +27,7 @@ macro_rules! system_parameter_tuple {
             type Lock<'state> = ($($param::Lock<'state>,)*);
 
             #[allow(clippy::unused_unit)]
-            fn lock(state: RunState<'_>) -> Self::Lock<'_> {
+            fn lock<'state>(state: &RunState<'state>) -> Self::Lock<'state> {
                 _ = state;
                 ($($param::lock(state),)*)
             }
