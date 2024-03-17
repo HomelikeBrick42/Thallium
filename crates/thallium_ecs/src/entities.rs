@@ -122,7 +122,7 @@ impl<'a> SystemParameter for Entities<'a> {
     type This<'this> = Entities<'this>;
     type Lock<'state> = &'state EntityMap;
 
-    fn lock(state: RunState<'_>) -> Self::Lock<'_> {
+    fn lock<'state>(state: &RunState<'state>) -> Self::Lock<'state> {
         state.entities
     }
 

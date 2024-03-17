@@ -39,7 +39,7 @@ where
     type This<'this> = Res<'this, R>;
     type Lock<'state> = MappedRwLockReadGuard<'state, R>;
 
-    fn lock(state: RunState<'_>) -> Self::Lock<'_> {
+    fn lock<'state>(state: &RunState<'state>) -> Self::Lock<'state> {
         RwLockReadGuard::map(
             state
                 .resources
@@ -75,7 +75,7 @@ where
     type This<'this> = Option<Res<'this, R>>;
     type Lock<'state> = Option<MappedRwLockReadGuard<'state, R>>;
 
-    fn lock(state: RunState<'_>) -> Self::Lock<'_> {
+    fn lock<'state>(state: &RunState<'state>) -> Self::Lock<'state> {
         Some(RwLockReadGuard::map(
             state
                 .resources
@@ -140,7 +140,7 @@ where
     type This<'this> = ResMut<'this, R>;
     type Lock<'state> = MappedRwLockWriteGuard<'state, R>;
 
-    fn lock(state: RunState<'_>) -> Self::Lock<'_> {
+    fn lock<'state>(state: &RunState<'state>) -> Self::Lock<'state> {
         RwLockWriteGuard::map(
             state
                 .resources
@@ -176,7 +176,7 @@ where
     type This<'this> = Option<ResMut<'this, R>>;
     type Lock<'state> = Option<MappedRwLockWriteGuard<'state, R>>;
 
-    fn lock(state: RunState<'_>) -> Self::Lock<'_> {
+    fn lock<'state>(state: &RunState<'state>) -> Self::Lock<'state> {
         Some(RwLockWriteGuard::map(
             state
                 .resources

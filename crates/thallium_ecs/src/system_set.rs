@@ -1,9 +1,9 @@
 use crate::{
     system::{Borrow, BorrowType, RunState},
-    System, SystemFunction, SystemWrapper,
+    IntoSystem, System,
 };
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
-use std::{any::TypeId, collections::HashMap, marker::PhantomData};
+use std::{any::TypeId, collections::HashMap};
 
 pub(crate) struct SystemGroup<'a> {
     resources: HashMap<TypeId, Borrow>,
@@ -27,11 +27,12 @@ impl<'a> SystemSet<'a> {
     /// Registers a [`System`] with this [`SystemSet`]
     pub fn register_system<S, Marker>(&mut self, system: S)
     where
-        SystemWrapper<S, Marker>: System + 'a,
-        S: SystemFunction<Marker>,
+        S: IntoSystem<Marker>,
+        S::System: 'a,
     {
-        let system = Box::new(SystemWrapper(system, PhantomData));
-        let (resources, components) = Self::check_system::<S, Marker>();
+        let system = system.into_system();
+        let (resources, components) = Self::check_system(&system);
+        let system = Box::new(system);
         for system_group in &mut self.system_groups {
             if system_group.resources.iter().any(|(id, borrow)| {
                 let Some(other_borrow) = resources.get(id) else {
@@ -69,16 +70,16 @@ impl<'a> SystemSet<'a> {
         });
     }
 
-    fn check_system<S, Marker>() -> (HashMap<TypeId, Borrow>, HashMap<TypeId, Borrow>)
+    fn check_system<S>(system: &S) -> (HashMap<TypeId, Borrow>, HashMap<TypeId, Borrow>)
     where
-        S: SystemFunction<Marker>,
+        S: System,
     {
         let mut seen_resource_types: HashMap<TypeId, Borrow> = HashMap::new();
         for borrow @ Borrow {
             id,
             name,
             borrow_type,
-        } in S::get_resource_types()
+        } in system.get_resource_types()
         {
             if let Some(old_borrow) = seen_resource_types.insert(id, borrow) {
                 match (old_borrow.borrow_type, borrow_type) {
@@ -98,7 +99,7 @@ impl<'a> SystemSet<'a> {
             id,
             name,
             borrow_type,
-        } in S::get_component_types()
+        } in system.get_component_types()
         {
             if let Some(borrow) = seen_component_types.insert(id, borrow) {
                 match (borrow.borrow_type, borrow_type) {
@@ -123,24 +124,102 @@ impl<'a> Default for SystemSet<'a> {
     }
 }
 
-impl<'a> System for SystemWrapper<SystemSet<'a>, ()> {
-    fn run(&mut self, state: RunState<'_>) {
-        for system_group in &mut self.0.system_groups {
+impl<'a> System for SystemSet<'a> {
+    fn run(&mut self, state: &RunState<'_>) {
+        for system_group in &mut self.system_groups {
             system_group
                 .systems
                 .par_iter_mut()
                 .for_each(|system| system.run(state));
         }
     }
+
+    fn get_resource_types(&self) -> impl Iterator<Item = Borrow> + '_
+    where
+        Self: Sized,
+    {
+        self.system_groups
+            .iter()
+            .fold(HashMap::new(), |mut a, b| {
+                for (&id, &borrow) in &b.resources {
+                    if let (
+                        Borrow {
+                            borrow_type: borrow_type @ BorrowType::Immutable,
+                            ..
+                        },
+                        BorrowType::Mutable,
+                    ) = (a.entry(id).or_insert(borrow), borrow.borrow_type)
+                    {
+                        *borrow_type = BorrowType::Mutable
+                    }
+                }
+                a
+            })
+            .into_values()
+    }
+
+    fn get_component_types(&self) -> impl Iterator<Item = Borrow> + '_
+    where
+        Self: Sized,
+    {
+        self.system_groups
+            .iter()
+            .fold(HashMap::new(), |mut a, b| {
+                for (&id, &borrow) in &b.components {
+                    if let (
+                        Borrow {
+                            borrow_type: borrow_type @ BorrowType::Immutable,
+                            ..
+                        },
+                        BorrowType::Mutable,
+                    ) = (a.entry(id).or_insert(borrow), borrow.borrow_type)
+                    {
+                        *borrow_type = BorrowType::Mutable
+                    }
+                }
+                a
+            })
+            .into_values()
+    }
 }
 
-impl<'a> System for SystemWrapper<&mut SystemSet<'a>, ()> {
-    fn run(&mut self, state: RunState<'_>) {
-        for system_group in &mut self.0.system_groups {
+impl<'a> System for &mut SystemSet<'a> {
+    fn run(&mut self, state: &RunState<'_>) {
+        for system_group in &mut self.system_groups {
             system_group
                 .systems
                 .par_iter_mut()
                 .for_each(|system| system.run(state));
         }
+    }
+
+    fn get_resource_types(&self) -> impl Iterator<Item = Borrow> + '_
+    where
+        Self: Sized,
+    {
+        SystemSet::get_resource_types(self)
+    }
+
+    fn get_component_types(&self) -> impl Iterator<Item = Borrow> + '_
+    where
+        Self: Sized,
+    {
+        SystemSet::get_component_types(self)
+    }
+}
+
+impl<'a> IntoSystem<()> for SystemSet<'a> {
+    type System = Self;
+
+    fn into_system(self) -> Self::System {
+        self
+    }
+}
+
+impl<'a> IntoSystem<()> for &mut SystemSet<'a> {
+    type System = Self;
+
+    fn into_system(self) -> Self::System {
+        self
     }
 }

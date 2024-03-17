@@ -65,7 +65,7 @@ impl<'a> SystemParameter for Commands<'a> {
     type This<'this> = Commands<'this>;
     type Lock<'state> = &'state CommandSender;
 
-    fn lock(state: RunState<'_>) -> Self::Lock<'_> {
+    fn lock<'state>(state: &RunState<'state>) -> Self::Lock<'state> {
         state.command_sender
     }
 
