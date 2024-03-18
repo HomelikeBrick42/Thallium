@@ -11,4 +11,7 @@ pub mod derive {
     pub use thallium_derive::*;
 }
 
-// An alias for [`thallium_renderer`]
+/// An alias for [`thallium_renderer`]
+pub mod renderer {
+    pub use thallium_renderer::*;
+}

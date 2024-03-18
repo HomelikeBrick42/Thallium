@@ -189,6 +189,10 @@ dependencies = [
 [[package]]
 name = "thallium_renderer"
 version = "0.1.0"
+dependencies = [
+ "thallium_derive",
+ "thallium_ecs",
+]
 
 [[package]]
 name = "unicode-ident"

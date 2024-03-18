@@ -7,6 +7,8 @@ license = "MIT"
 repository = "https://github.com/HomelikeBrick42/Thallium"
 
 [dependencies]
+thallium_ecs = { path = "../thallium_ecs", version = "0.5.0" }
+thallium_derive = { path = "../thallium_derive", version = "0.1.2" }
 
 [lints]
 workspace = true
