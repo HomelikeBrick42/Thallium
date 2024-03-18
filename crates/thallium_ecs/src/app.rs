@@ -12,6 +12,7 @@ pub struct App {
     resources: ResourceMap,
     entities: EntityMap,
     components: ComponentMap,
+    current_tick: u64,
 }
 
 impl App {
@@ -21,6 +22,7 @@ impl App {
             resources: HashMap::new(),
             entities: EntityMap::new(),
             components: HashMap::new(),
+            current_tick: 0,
         }
     }
 
@@ -79,7 +81,7 @@ impl App {
             .or_insert_with(|| RwLock::new(Box::new(ComponentContainer::<C>::new())))
             .get_mut()
             .downcast_mut::<C>()
-            .insert(entity, component);
+            .insert(entity, self.current_tick, component);
 
         self.entities.add_component(entity, component_id);
     }
@@ -114,11 +116,17 @@ impl App {
             entities: &self.entities,
             components: &self.components,
             command_sender: &command_sender,
+            current_tick: self.current_tick,
         });
         drop(command_sender);
         for command in command_receiver {
             command(self);
         }
+    }
+
+    /// Advances to the next tick, this effects stuff like modification checking
+    pub fn next_tick(&mut self) {
+        self.current_tick += 1;
     }
 }
 

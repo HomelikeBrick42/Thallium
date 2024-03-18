@@ -50,7 +50,7 @@ where
 {
     pub(crate) generation: NonZeroUsize,
     pub(crate) component: C,
-    pub(crate) modified: bool,
+    pub(crate) last_modified_tick: u64,
 }
 
 pub struct ComponentContainer<C>
@@ -70,14 +70,14 @@ where
         }
     }
 
-    pub(crate) fn insert(&mut self, entity: Entity, component: C) {
+    pub(crate) fn insert(&mut self, current_tick: u64, entity: Entity, component: C) {
         if entity.id >= self.components.len() {
             self.components.resize_with(entity.id + 1, || None);
         }
         self.components[entity.id] = Some(ComponentSlot {
             generation: entity.generation,
             component,
-            modified: true,
+            last_modified_tick: current_tick,
         });
     }
 
@@ -92,7 +92,7 @@ where
         None
     }
 
-    pub(crate) fn get(&self, entity: Entity) -> Option<Ref<'_, C>> {
+    pub(crate) fn get(&self, current_tick: u64, entity: Entity) -> Option<Ref<'_, C>> {
         self.components
             .get(entity.id)
             .and_then(|slot| slot.as_ref())
@@ -100,17 +100,18 @@ where
                 |&ComponentSlot {
                      generation,
                      ref component,
-                     modified,
+                     last_modified_tick,
                  }| {
                     (generation == entity.generation).then_some(Ref {
                         component,
-                        modified,
+                        last_modified_tick,
+                        current_tick,
                     })
                 },
             )
     }
 
-    pub(crate) fn get_mut(&mut self, entity: Entity) -> Option<RefMut<'_, C>> {
+    pub(crate) fn get_mut(&mut self, current_tick: u64, entity: Entity) -> Option<RefMut<'_, C>> {
         self.components
             .get_mut(entity.id)
             .and_then(|slot| slot.as_mut())
@@ -118,11 +119,12 @@ where
                 |&mut ComponentSlot {
                      generation,
                      ref mut component,
-                     ref mut modified,
+                     ref mut last_modified_tick,
                  }| {
                     (generation == entity.generation).then_some(RefMut {
                         component,
-                        modified,
+                        last_modified_tick,
+                        current_tick,
                     })
                 },
             )
@@ -131,6 +133,7 @@ where
     #[allow(unsafe_code)]
     pub(crate) fn get_many_mut<const N: usize>(
         &mut self,
+        current_tick: u64,
         entities: [Entity; N],
     ) -> Option<[RefMut<'_, C>; N]> {
         // check that there are no invalid entities
@@ -182,12 +185,13 @@ where
             Some(entities.map(|entity| {
                 let ComponentSlot {
                     component,
-                    modified,
+                    last_modified_tick,
                     ..
                 } = (*components_ptr.add(entity.id)).as_mut().unwrap_unchecked();
                 RefMut {
                     component,
-                    modified,
+                    last_modified_tick,
+                    current_tick,
                 }
             }))
         }

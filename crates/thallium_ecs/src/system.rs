@@ -19,6 +19,7 @@ pub struct RunState<'a> {
     pub(crate) entities: &'a EntityMap,
     pub(crate) components: &'a ComponentMap,
     pub(crate) command_sender: &'a CommandSender,
+    pub(crate) current_tick: u64,
 }
 
 #[derive(Clone, Copy)]

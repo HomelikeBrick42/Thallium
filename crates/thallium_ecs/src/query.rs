@@ -13,16 +13,17 @@ where
     C: Component,
 {
     pub(crate) component: &'a C,
-    pub(crate) modified: bool,
+    pub(crate) last_modified_tick: u64,
+    pub(crate) current_tick: u64,
 }
 
 impl<'a, C> Ref<'a, C>
 where
     C: Component,
 {
-    /// Returns whether this [`Component`] has been modified in the past frame
+    /// Returns whether this [`Component`] has been modified in this or the previous tick
     pub fn get_modified(&self) -> bool {
-        self.modified
+        (self.current_tick - self.last_modified_tick) <= 1
     }
 }
 
@@ -43,16 +44,17 @@ where
     C: Component,
 {
     pub(crate) component: &'a mut C,
-    pub(crate) modified: &'a mut bool,
+    pub(crate) last_modified_tick: &'a mut u64,
+    pub(crate) current_tick: u64,
 }
 
 impl<'a, C> RefMut<'a, C>
 where
     C: Component,
 {
-    /// Returns whether this [`Component`] has been modified in the past frame
+    /// Returns whether this [`Component`] has been modified in this or the previous tick
     pub fn get_modified(&self) -> bool {
-        *self.modified
+        (self.current_tick - *self.last_modified_tick) <= 1
     }
 
     /// Gets a reference to the inner [`Component`] without setting the `modified` flag
@@ -77,7 +79,7 @@ where
     C: Component,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        *self.modified = true;
+        *self.last_modified_tick = self.current_tick;
         self.component
     }
 }
@@ -89,6 +91,7 @@ where
 {
     entities: &'a EntityMap,
     container: Q::ComponentContainer<'a>,
+    current_tick: u64,
 }
 
 impl<'a, Q> SystemParameter for Query<'a, Q>
@@ -96,17 +99,18 @@ where
     Q: QueryParameter,
 {
     type This<'this> = Query<'this, Q>;
-    type Lock<'state> = (&'state EntityMap, Q::ComponentContainerLock<'state>);
+    type Lock<'state> = (&'state EntityMap, Q::ComponentContainerLock<'state>, u64);
 
     fn lock<'state>(state: &RunState<'state>) -> Self::Lock<'state> {
-        (state.entities, Q::lock(state))
+        (state.entities, Q::lock(state), state.current_tick)
     }
 
     fn construct<'this>(state: &'this mut Self::Lock<'_>) -> Self::This<'this> {
-        let (entities, state) = state;
+        let (entities, state, current_tick) = state;
         Query {
             entities,
             container: Q::construct(state),
+            current_tick: *current_tick,
         }
     }
 
