@@ -15,7 +15,7 @@ pub struct Point3 {
 
 impl Point3 {
     /// The point representing the origin
-    pub const IDENTITY: Point3 = Point3 {
+    pub const ORIGIN: Point3 = Point3 {
         e023: 0.0,
         e013: 0.0,
         e012: 0.0,
