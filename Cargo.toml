@@ -1,9 +1,8 @@
 [package]
 name = "thallium"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 description = "A basic game engine"
-exclude = ["crates/"]
 license = "MIT"
 repository = "https://github.com/HomelikeBrick42/Thallium"
 
