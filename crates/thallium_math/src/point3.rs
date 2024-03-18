@@ -36,6 +36,18 @@ impl Point3 {
         }
     }
 
+    /// Converts a cartesian normal to a [`Point3`], will return a point at infinity
+    #[inline]
+    #[must_use]
+    pub fn from_cartesian_normal(x: f32, y: f32, z: f32) -> Point3 {
+        Point3 {
+            e023: x,
+            e013: -y,
+            e012: z,
+            e0123: 0.0,
+        }
+    }
+
     /// Converts a [`Point3`] to a cartesian point, will divide by 0 if it is a point at infinity
     #[inline]
     #[must_use]
@@ -45,6 +57,13 @@ impl Point3 {
             -self.e013 / self.e0123,
             self.e012 / self.e0123,
         ]
+    }
+
+    /// Converts a [`Point3`] to a cartesian normal, assuming the magnitude is 0
+    #[inline]
+    #[must_use]
+    pub fn into_cartesian_normal(self) -> [f32; 3] {
+        [self.e023, -self.e013, self.e012]
     }
 
     /// Gets the magnitude of the [`Point3`], this just returns [`Point3::e0123`]
