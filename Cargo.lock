@@ -166,6 +166,7 @@ version = "0.5.1"
 dependencies = [
  "thallium_derive",
  "thallium_ecs",
+ "thallium_math",
 ]
 
 [[package]]
