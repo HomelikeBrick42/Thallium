@@ -10,3 +10,5 @@ pub mod ecs {
 pub mod derive {
     pub use thallium_derive::*;
 }
+
+// An alias for [`thallium_renderer`]

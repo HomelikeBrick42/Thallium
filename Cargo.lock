@@ -166,6 +166,7 @@ version = "0.5.1"
 dependencies = [
  "thallium_derive",
  "thallium_ecs",
+ "thallium_renderer",
 ]
 
 [[package]]
@@ -184,6 +185,10 @@ dependencies = [
  "parking_lot",
  "rayon",
 ]
+
+[[package]]
+name = "thallium_renderer"
+version = "0.1.0"
 
 [[package]]
 name = "unicode-ident"
