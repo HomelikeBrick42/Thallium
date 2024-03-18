@@ -4,4 +4,4 @@
 [![Rust Documentation](https://docs.rs/thallium_derive/badge.svg)](https://docs.rs/thallium_derive)
 ![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)
 
-All the derive macros for the `thallium` crate
+All the math for the `thallium` crate
