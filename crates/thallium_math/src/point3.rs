@@ -1,9 +1,7 @@
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign};
 
-use thallium_derive::Component;
-
 /// The type for storing PGA points
-#[derive(Debug, Clone, Copy, Component)]
+#[derive(Debug, Clone, Copy)]
 pub struct Point3 {
     /// The "x" component
     pub e023: f32,
