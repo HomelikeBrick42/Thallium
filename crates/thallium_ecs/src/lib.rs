@@ -19,7 +19,7 @@ pub use entities::{Entities, Entity};
 pub use query::{Query, Ref, RefMut};
 pub use query_parameters::QueryParameter;
 pub use resource::{Res, ResMut, Resource};
-pub use system::{IntoSystem, System};
+pub use system::{IntoSystem, System, SystemFunction};
 pub use system_parameters::SystemParameter;
 pub use system_set::SystemSet;
 
@@ -48,8 +48,8 @@ mod tests {
         app.add_component(entity2, TestComponent { value: 44 });
         app.add_component(entity2, TestComponent2 { value: 0 });
 
-        app.run(|mut q: Query<'_, RefMut<TestComponent>>| {
-            let [c1, c2] = q.get_many_mut([entity1, entity2]).unwrap();
+        app.run(|mut q: Query<'_, RefMut<'_, TestComponent>>| {
+            let [mut c1, mut c2] = q.get_many_mut([entity1, entity2]).unwrap();
             assert_eq!(c1.value, 42);
             assert_eq!(c2.value, 44);
             c1.value += 1;
@@ -58,8 +58,8 @@ mod tests {
 
         let mut set = SystemSet::new();
         set.register_system(
-            |q1: Query<'_, Ref<TestComponent>>,
-             q2: Query<'_, Option<(Ref<TestComponent2>, Ref<TestComponent>)>>| {
+            |q1: Query<'_, Ref<'_, TestComponent>>,
+             q2: Query<'_, Option<(Ref<'_, TestComponent2>, Ref<'_, TestComponent>)>>| {
                 for (entity, c) in q1.iter() {
                     assert_eq!(c.value, 43);
                     if let Some((c2, c)) = q2.get(entity).unwrap() {
@@ -76,15 +76,17 @@ mod tests {
             commands.create_entity(TestComponent { value: 5 });
         });
 
-        app.run(|entities: Entities<'_>, q: Query<'_, Ref<TestComponent>>| {
-            assert_eq!(entities.iter().count(), 4);
-            assert_eq!(
-                entities
-                    .iter()
-                    .filter(|&entity| q.get(entity).is_some())
-                    .count(),
-                3
-            );
-        });
+        app.run(
+            |entities: Entities<'_>, q: Query<'_, Ref<'_, TestComponent>>| {
+                assert_eq!(entities.iter().count(), 4);
+                assert_eq!(
+                    entities
+                        .iter()
+                        .filter(|&entity| q.get(entity).is_some())
+                        .count(),
+                    3
+                );
+            },
+        );
     }
 }

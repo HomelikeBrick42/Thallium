@@ -27,7 +27,7 @@ pub trait QueryParameter {
     fn get_component_types() -> impl Iterator<Item = Borrow>;
 }
 
-impl<C> QueryParameter for Ref<C>
+impl<C> QueryParameter for Ref<'_, C>
 where
     C: Component,
 {
@@ -60,7 +60,7 @@ where
     }
 }
 
-impl<C> QueryParameter for RefMut<C>
+impl<C> QueryParameter for RefMut<'_, C>
 where
     C: Component,
 {

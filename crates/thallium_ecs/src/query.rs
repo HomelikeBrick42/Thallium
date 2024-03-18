@@ -1,21 +1,86 @@
 use crate::{
-    component_container::ComponentContainer,
+    component_container::{ComponentContainer, ComponentSlot},
     entities::EntityMap,
     query_parameters::OptionalComponentContainer,
     system::{Borrow, RunState},
     Component, Entity, QueryParameter, SystemParameter,
 };
-use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 
 /// The [`QueryParameter`] for getting a reference to a [`Component`]
-pub struct Ref<C>(PhantomData<fn() -> C>)
+pub struct Ref<'a, C>
 where
-    C: Component;
+    C: Component,
+{
+    pub(crate) component: &'a C,
+    pub(crate) modified: bool,
+}
+
+impl<'a, C> Ref<'a, C>
+where
+    C: Component,
+{
+    /// Returns whether this [`Component`] has been modified in the past frame
+    pub fn get_modified(&self) -> bool {
+        self.modified
+    }
+}
+
+impl<'a, C> Deref for Ref<'a, C>
+where
+    C: Component,
+{
+    type Target = C;
+
+    fn deref(&self) -> &Self::Target {
+        self.component
+    }
+}
 
 /// The [`QueryParameter`] for getting a mutable reference to a [`Component`]
-pub struct RefMut<C>(PhantomData<fn() -> C>)
+pub struct RefMut<'a, C>
 where
-    C: Component;
+    C: Component,
+{
+    pub(crate) component: &'a mut C,
+    pub(crate) modified: &'a mut bool,
+}
+
+impl<'a, C> RefMut<'a, C>
+where
+    C: Component,
+{
+    /// Returns whether this [`Component`] has been modified in the past frame
+    pub fn get_modified(&self) -> bool {
+        *self.modified
+    }
+
+    /// Gets a reference to the inner [`Component`] without setting the `modified` flag
+    pub fn silently_modify(&mut self) -> &mut C {
+        self.component
+    }
+}
+
+impl<'a, C> Deref for RefMut<'a, C>
+where
+    C: Component,
+{
+    type Target = C;
+
+    fn deref(&self) -> &Self::Target {
+        self.component
+    }
+}
+
+impl<'a, C> DerefMut for RefMut<'a, C>
+where
+    C: Component,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        *self.modified = true;
+        self.component
+    }
+}
 
 /// A [`SystemParameter`] that lets you get references to [`Component`]s specified in `Q`
 pub struct Query<'a, Q>
@@ -137,10 +202,10 @@ impl<'a, C> ComponentContainerTrait<'a> for Option<&'a ComponentContainer<C>>
 where
     C: Component,
 {
-    type Parameter<'param> = &'param C
+    type Parameter<'param> = Ref<'param, C>
     where
         Self: 'param;
-    type ParameterMut<'param> = &'param C
+    type ParameterMut<'param> = Ref<'param, C>
     where
         Self: 'param;
 
@@ -172,11 +237,16 @@ where
     fn iter(&self) -> impl Iterator<Item = Option<Self::Parameter<'_>>> {
         self.as_ref().into_iter().flat_map(|this| {
             this.components.iter().map(|slot| {
-                if let Some((_, component)) = slot {
-                    Some(component)
-                } else {
-                    None
-                }
+                slot.as_ref().map(
+                    |&ComponentSlot {
+                         ref component,
+                         modified,
+                         ..
+                     }| Ref {
+                        component,
+                        modified,
+                    },
+                )
             })
         })
     }
@@ -184,11 +254,16 @@ where
     fn iter_mut(&mut self) -> impl Iterator<Item = Option<Self::ParameterMut<'_>>> {
         self.as_mut().into_iter().flat_map(|this| {
             this.components.iter().map(|slot| {
-                if let Some((_, component)) = slot {
-                    Some(component)
-                } else {
-                    None
-                }
+                slot.as_ref().map(
+                    |&ComponentSlot {
+                         ref component,
+                         modified,
+                         ..
+                     }| Ref {
+                        component,
+                        modified,
+                    },
+                )
             })
         })
     }
@@ -198,10 +273,10 @@ impl<'a, C> ComponentContainerTrait<'a> for Option<&'a mut ComponentContainer<C>
 where
     C: Component,
 {
-    type Parameter<'param> = &'param C
+    type Parameter<'param> = Ref<'param, C>
     where
         Self: 'param;
-    type ParameterMut<'param> = &'param mut C
+    type ParameterMut<'param> = RefMut<'param, C>
     where
         Self: 'param;
 
@@ -223,11 +298,16 @@ where
     fn iter(&self) -> impl Iterator<Item = Option<Self::Parameter<'_>>> {
         self.as_ref().into_iter().flat_map(|this| {
             this.components.iter().map(|slot| {
-                if let Some((_, component)) = slot {
-                    Some(component)
-                } else {
-                    None
-                }
+                slot.as_ref().map(
+                    |&ComponentSlot {
+                         ref component,
+                         modified,
+                         ..
+                     }| Ref {
+                        component,
+                        modified,
+                    },
+                )
             })
         })
     }
@@ -235,11 +315,16 @@ where
     fn iter_mut(&mut self) -> impl Iterator<Item = Option<Self::ParameterMut<'_>>> {
         self.as_mut().into_iter().flat_map(|this| {
             this.components.iter_mut().map(|slot| {
-                if let Some((_, component)) = slot {
-                    Some(component)
-                } else {
-                    None
-                }
+                slot.as_mut().map(
+                    |ComponentSlot {
+                         component,
+                         modified,
+                         ..
+                     }| RefMut {
+                        component,
+                        modified,
+                    },
+                )
             })
         })
     }

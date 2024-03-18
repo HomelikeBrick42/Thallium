@@ -94,10 +94,13 @@ where
     }
 }
 
+/// The trait for functions which can be used as [`System`]s
 pub trait SystemFunction<Marker>: Send + Sync {
     /// Runs the system
     fn run(&mut self, state: &RunState<'_>);
+    /// Gets the [`Resource`](crate::Component) types that this [`SystemFunction`] will use
     fn get_resource_types() -> impl Iterator<Item = Borrow>;
+    /// Gets the [`Component`](crate::Component) types that this [`SystemFunction`] will use
     fn get_component_types() -> impl Iterator<Item = Borrow>;
 }
 

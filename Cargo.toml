@@ -20,6 +20,7 @@ type_complexity = "allow"
 unsafe_code = "deny"
 unsafe_op_in_unsafe_fn = "deny"
 missing_docs = "warn"
+elided_lifetimes_in_paths = "deny"
 
 [lints]
 workspace = true
