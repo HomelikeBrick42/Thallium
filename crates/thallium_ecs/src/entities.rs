@@ -1,5 +1,5 @@
 use crate::{
-    system::{Borrow, RunState},
+    system::{Borrow, SystemRunState},
     SystemParameter,
 };
 use std::{any::TypeId, collections::HashSet, num::NonZeroUsize};
@@ -122,11 +122,12 @@ impl<'a> SystemParameter for Entities<'a> {
     type This<'this> = Entities<'this>;
     type Lock<'state> = &'state EntityMap;
 
-    fn lock<'state>(state: &RunState<'state>) -> Self::Lock<'state> {
+    fn lock<'state>(state: &SystemRunState<'state>) -> Self::Lock<'state> {
         state.entities
     }
 
-    fn construct<'this>(state: &'this mut Self::Lock<'_>) -> Self::This<'this> {
+    fn construct<'this>(state: &'this mut Self::Lock<'_>, last_run_tick: u64) -> Self::This<'this> {
+        _ = last_run_tick;
         Entities { entities: state }
     }
 
