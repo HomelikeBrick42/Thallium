@@ -10,3 +10,8 @@ pub mod ecs {
 pub mod derive {
     pub use thallium_derive::*;
 }
+
+/// An alias for [`thallium_math`]
+pub mod math {
+    pub use thallium_math::*;
+}

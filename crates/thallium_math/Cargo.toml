@@ -1,0 +1,14 @@
+[package]
+name = "thallium_math"
+version = "0.1.0"
+edition = "2021"
+description = "The math for the thallium crate"
+license = "MIT"
+repository = "https://github.com/HomelikeBrick42/Thallium"
+
+[dependencies]
+thallium_ecs = { path = "../thallium_ecs", version = "0.6.0" }
+thallium_derive = { path = "../thallium_derive", version = "0.2.0" }
+
+[lints]
+workspace = true
