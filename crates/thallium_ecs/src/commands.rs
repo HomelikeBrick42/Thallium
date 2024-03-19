@@ -1,6 +1,6 @@
 use crate::{
     component::ComponentBundle,
-    system::{CommandSender, RunState},
+    system::{CommandSender, SystemRunState},
     App, Entity, SystemParameter,
 };
 
@@ -65,11 +65,12 @@ impl<'a> SystemParameter for Commands<'a> {
     type This<'this> = Commands<'this>;
     type Lock<'state> = &'state CommandSender;
 
-    fn lock<'state>(state: &RunState<'state>) -> Self::Lock<'state> {
+    fn lock<'state>(state: &SystemRunState<'state>) -> Self::Lock<'state> {
         state.command_sender
     }
 
-    fn construct<'this>(state: &'this mut Self::Lock<'_>) -> Self::This<'this> {
+    fn construct<'this>(state: &'this mut Self::Lock<'_>, last_run_tick: u64) -> Self::This<'this> {
+        _ = last_run_tick;
         Commands {
             command_sender: state,
         }

@@ -14,11 +14,12 @@ pub(crate) type ComponentMap = HashMap<TypeId, RwLock<Box<dyn DynComponentContai
 pub(crate) type CommandSender = Sender<Box<dyn FnOnce(&mut App) + Send>>;
 
 #[derive(Clone, Copy)]
-pub struct RunState<'a> {
+pub struct SystemRunState<'a> {
     pub(crate) resources: &'a ResourceMap,
     pub(crate) entities: &'a EntityMap,
     pub(crate) components: &'a ComponentMap,
     pub(crate) command_sender: &'a CommandSender,
+    pub(crate) current_tick: u64,
 }
 
 #[derive(Clone, Copy)]
@@ -37,7 +38,7 @@ pub struct Borrow {
 /// An ECS system that can be added to a [`SystemSet`](crate::SystemSet)
 pub trait System: Send + Sync {
     /// Runs the system
-    fn run(&mut self, state: &RunState<'_>);
+    fn run(&mut self, state: &SystemRunState<'_>);
     /// Returns an iterator over all [`Resource`](crate::Resource) types that this [`System`] will use
     fn get_resource_types(&self) -> impl Iterator<Item = Borrow> + '_
     where
@@ -57,15 +58,22 @@ pub trait IntoSystem<Marker> {
     fn into_system(self) -> Self::System;
 }
 
-pub struct SystemFunctionWrapper<F, Marker>(pub(crate) F, pub(crate) PhantomData<fn(Marker)>)
+pub struct SystemFunctionWrapper<F, Marker>
 where
-    F: SystemFunction<Marker>;
+    F: SystemFunction<Marker>,
+{
+    pub(crate) func: F,
+    pub(crate) last_run_tick: u64,
+    pub(crate) marker: PhantomData<fn(Marker)>,
+}
+
 impl<F, Marker> System for SystemFunctionWrapper<F, Marker>
 where
     F: SystemFunction<Marker>,
 {
-    fn run(&mut self, state: &RunState<'_>) {
-        F::run(&mut self.0, state);
+    fn run(&mut self, state: &SystemRunState<'_>) {
+        F::run(&mut self.func, state, self.last_run_tick);
+        self.last_run_tick = state.current_tick;
     }
 
     fn get_resource_types(&self) -> impl Iterator<Item = Borrow> + '_
@@ -90,14 +98,21 @@ where
     type System = SystemFunctionWrapper<F, Marker>;
 
     fn into_system(self) -> Self::System {
-        SystemFunctionWrapper(self, PhantomData)
+        SystemFunctionWrapper {
+            func: self,
+            last_run_tick: 0,
+            marker: PhantomData,
+        }
     }
 }
 
+/// The trait for functions which can be used as [`System`]s
 pub trait SystemFunction<Marker>: Send + Sync {
     /// Runs the system
-    fn run(&mut self, state: &RunState<'_>);
+    fn run(&mut self, state: &SystemRunState<'_>, last_run_tick: u64);
+    /// Gets the [`Resource`](crate::Component) types that this [`SystemFunction`] will use
     fn get_resource_types() -> impl Iterator<Item = Borrow>;
+    /// Gets the [`Component`](crate::Component) types that this [`SystemFunction`] will use
     fn get_component_types() -> impl Iterator<Item = Borrow>;
 }
 
@@ -108,13 +123,14 @@ macro_rules! system_function_impl {
             for<'a> Func: FnMut($($param),*) + FnMut($($param::This<'a>),*) + Send + Sync,
             $($param: SystemParameter,)*
         {
-            fn run(&mut self, state: &RunState<'_>) {
+            fn run(&mut self, state: &SystemRunState<'_>, last_run_tick: u64) {
+                _ = last_run_tick;
                 _ = state;
                 $(
                     #[allow(non_snake_case)]
                     let mut $param = $param::lock(state);
                 )*
-                self($($param::construct(&mut $param)),*)
+                self($($param::construct(&mut $param, last_run_tick)),*)
             }
 
             fn get_resource_types() -> impl Iterator<Item = Borrow> {
