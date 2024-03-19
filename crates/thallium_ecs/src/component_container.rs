@@ -92,7 +92,7 @@ where
         None
     }
 
-    pub(crate) fn get(&self, current_tick: u64, entity: Entity) -> Option<Ref<'_, C>> {
+    pub(crate) fn get(&self, last_run_tick: u64, entity: Entity) -> Option<Ref<'_, C>> {
         self.components
             .get(entity.id)
             .and_then(|slot| slot.as_ref())
@@ -105,13 +105,18 @@ where
                     (generation == entity.generation).then_some(Ref {
                         component,
                         last_modified_tick,
-                        current_tick,
+                        last_run_tick,
                     })
                 },
             )
     }
 
-    pub(crate) fn get_mut(&mut self, current_tick: u64, entity: Entity) -> Option<RefMut<'_, C>> {
+    pub(crate) fn get_mut(
+        &mut self,
+        last_run_tick: u64,
+        current_tick: u64,
+        entity: Entity,
+    ) -> Option<RefMut<'_, C>> {
         self.components
             .get_mut(entity.id)
             .and_then(|slot| slot.as_mut())
@@ -124,6 +129,7 @@ where
                     (generation == entity.generation).then_some(RefMut {
                         component,
                         last_modified_tick,
+                        last_run_tick,
                         current_tick,
                     })
                 },
@@ -133,6 +139,7 @@ where
     #[allow(unsafe_code)]
     pub(crate) fn get_many_mut<const N: usize>(
         &mut self,
+        last_run_tick: u64,
         current_tick: u64,
         entities: [Entity; N],
     ) -> Option<[RefMut<'_, C>; N]> {
@@ -191,6 +198,7 @@ where
                 RefMut {
                     component,
                     last_modified_tick,
+                    last_run_tick,
                     current_tick,
                 }
             }))

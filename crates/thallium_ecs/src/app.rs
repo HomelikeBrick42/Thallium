@@ -1,7 +1,8 @@
 use crate::{
     component_container::ComponentContainer,
     entities::EntityMap,
-    system::{ComponentMap, ResourceMap, RunState},
+    resource_container::ResourceContainer,
+    system::{ComponentMap, ResourceMap, SystemRunState},
     Component, Entity, IntoSystem, Resource, System,
 };
 use parking_lot::RwLock;
@@ -31,8 +32,13 @@ impl App {
     where
         R: Resource,
     {
-        self.resources
-            .insert(TypeId::of::<R>(), RwLock::new(Box::new(resource)));
+        self.resources.insert(
+            TypeId::of::<R>(),
+            RwLock::new(Box::new(ResourceContainer {
+                resource,
+                last_modified_tick: self.current_tick + 1,
+            })),
+        );
     }
 
     /// Removes a [`Resource`] from the [`App`] and returns it
@@ -40,9 +46,13 @@ impl App {
     where
         R: Resource,
     {
-        self.resources
-            .remove(&TypeId::of::<R>())
-            .map(|resource| *resource.into_inner().downcast::<R>().unwrap())
+        self.resources.remove(&TypeId::of::<R>()).map(|resource| {
+            resource
+                .into_inner()
+                .downcast::<ResourceContainer<R>>()
+                .unwrap()
+                .resource
+        })
     }
 
     /// Creates an [`Entity`]
@@ -81,7 +91,7 @@ impl App {
             .or_insert_with(|| RwLock::new(Box::new(ComponentContainer::<C>::new())))
             .get_mut()
             .downcast_mut::<C>()
-            .insert(entity, self.current_tick, component);
+            .insert(self.current_tick + 1, entity, component);
 
         self.entities.add_component(entity, component_id);
     }
@@ -111,7 +121,7 @@ impl App {
         S: IntoSystem<Marker>,
     {
         let (command_sender, command_receiver) = std::sync::mpsc::channel();
-        system.into_system().run(&RunState {
+        system.into_system().run(&SystemRunState {
             resources: &self.resources,
             entities: &self.entities,
             components: &self.components,

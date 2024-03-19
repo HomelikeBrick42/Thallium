@@ -11,6 +11,7 @@ mod resource;
 mod system;
 mod system_parameters;
 mod system_set;
+mod resource_container;
 
 pub use app::App;
 pub use commands::Commands;

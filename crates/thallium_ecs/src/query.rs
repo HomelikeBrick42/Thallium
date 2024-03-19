@@ -2,7 +2,7 @@ use crate::{
     component_container::{ComponentContainer, ComponentSlot},
     entities::EntityMap,
     query_parameters::OptionalComponentContainer,
-    system::{Borrow, RunState},
+    system::{Borrow, SystemRunState},
     Component, Entity, QueryParameter, SystemParameter,
 };
 use std::ops::{Deref, DerefMut};
@@ -14,16 +14,16 @@ where
 {
     pub(crate) component: &'a C,
     pub(crate) last_modified_tick: u64,
-    pub(crate) current_tick: u64,
+    pub(crate) last_run_tick: u64,
 }
 
 impl<'a, C> Ref<'a, C>
 where
     C: Component,
 {
-    /// Returns whether this [`Component`] has been modified in this or the previous tick
+    /// Returns whether this [`Component`] has been modified since the last system has run
     pub fn get_modified(&self) -> bool {
-        (self.current_tick - self.last_modified_tick) <= 1
+        self.last_run_tick < self.last_modified_tick
     }
 }
 
@@ -45,6 +45,7 @@ where
 {
     pub(crate) component: &'a mut C,
     pub(crate) last_modified_tick: &'a mut u64,
+    pub(crate) last_run_tick: u64,
     pub(crate) current_tick: u64,
 }
 
@@ -52,12 +53,12 @@ impl<'a, C> RefMut<'a, C>
 where
     C: Component,
 {
-    /// Returns whether this [`Component`] has been modified in this or the previous tick
+    /// Returns whether this [`Component`] has been modified since the last time this system was run
     pub fn get_modified(&self) -> bool {
-        (self.current_tick - *self.last_modified_tick) <= 1
+        self.last_run_tick < *self.last_modified_tick
     }
 
-    /// Gets a reference to the inner [`Component`] without setting the `modified` flag
+    /// Gets a reference to the inner [`Component`] without triggering the modification detection
     pub fn silently_modify(&mut self) -> &mut C {
         self.component
     }
@@ -92,6 +93,7 @@ where
     entities: &'a EntityMap,
     container: Q::ComponentContainer<'a>,
     current_tick: u64,
+    last_run_tick: u64,
 }
 
 impl<'a, Q> SystemParameter for Query<'a, Q>
@@ -101,16 +103,17 @@ where
     type This<'this> = Query<'this, Q>;
     type Lock<'state> = (&'state EntityMap, Q::ComponentContainerLock<'state>, u64);
 
-    fn lock<'state>(state: &RunState<'state>) -> Self::Lock<'state> {
+    fn lock<'state>(state: &SystemRunState<'state>) -> Self::Lock<'state> {
         (state.entities, Q::lock(state), state.current_tick)
     }
 
-    fn construct<'this>(state: &'this mut Self::Lock<'_>) -> Self::This<'this> {
+    fn construct<'this>(state: &'this mut Self::Lock<'_>, last_run_tick: u64) -> Self::This<'this> {
         let (entities, state, current_tick) = state;
         Query {
             entities,
             container: Q::construct(state),
             current_tick: *current_tick,
+            last_run_tick,
         }
     }
 
@@ -132,7 +135,7 @@ where
         &'b self,
         entity: Entity,
     ) -> Option<<Q::ComponentContainer<'a> as ComponentContainerTrait<'a>>::Parameter<'b>> {
-        self.container.get(entity)
+        self.container.get(self.last_run_tick, entity)
     }
 
     /// Gets mutable access to the [`Component`]s that are attached to `entity`
@@ -140,7 +143,8 @@ where
         &'b mut self,
         entity: Entity,
     ) -> Option<<Q::ComponentContainer<'a> as ComponentContainerTrait<'a>>::ParameterMut<'b>> {
-        self.container.get_mut(entity)
+        self.container
+            .get_mut(self.last_run_tick, self.current_tick, entity)
     }
 
     /// Semantically the same as calling [`Query::get_mut`] multiple times for each [`Entity`] in the `entities` array, also returns [`None`] if there are any duplicates in `entities`
@@ -149,7 +153,8 @@ where
         entities: [Entity; N],
     ) -> Option<[<Q::ComponentContainer<'a> as ComponentContainerTrait<'a>>::ParameterMut<'b>; N]>
     {
-        self.container.get_many_mut(entities)
+        self.container
+            .get_many_mut(self.last_run_tick, self.current_tick, entities)
     }
 
     /// Returns an iterator over all the [`Component`]s, also gives the [`Entity`] that the [`Component`]s are attached to
@@ -163,7 +168,7 @@ where
     > + 'b {
         self.entities
             .iter()
-            .zip(self.container.iter())
+            .zip(self.container.iter(self.last_run_tick))
             .filter_map(|(entity, parameter)| entity.zip(parameter))
     }
 
@@ -178,7 +183,10 @@ where
     > + 'b {
         self.entities
             .iter()
-            .zip(self.container.iter_mut())
+            .zip(
+                self.container
+                    .iter_mut(self.last_run_tick, self.current_tick),
+            )
             .filter_map(|(entity, parameter)| entity.zip(parameter))
     }
 }
@@ -191,15 +199,26 @@ pub trait ComponentContainerTrait<'a>: Send + Sync {
     where
         Self: 'param;
 
-    fn get(&self, entity: Entity) -> Option<Self::Parameter<'_>>;
-    fn get_mut(&mut self, entity: Entity) -> Option<Self::ParameterMut<'_>>;
+    fn get(&self, last_run_tick: u64, entity: Entity) -> Option<Self::Parameter<'_>>;
+    fn get_mut(
+        &mut self,
+        last_run_tick: u64,
+        current_tick: u64,
+        entity: Entity,
+    ) -> Option<Self::ParameterMut<'_>>;
     fn get_many_mut<const N: usize>(
         &mut self,
+        last_run_tick: u64,
+        current_tick: u64,
         entities: [Entity; N],
     ) -> Option<[Self::ParameterMut<'_>; N]>;
 
-    fn iter(&self) -> impl Iterator<Item = Option<Self::Parameter<'_>>>;
-    fn iter_mut(&mut self) -> impl Iterator<Item = Option<Self::ParameterMut<'_>>>;
+    fn iter(&self, last_run_tick: u64) -> impl Iterator<Item = Option<Self::Parameter<'_>>>;
+    fn iter_mut(
+        &mut self,
+        last_run_tick: u64,
+        current_tick: u64,
+    ) -> impl Iterator<Item = Option<Self::ParameterMut<'_>>>;
 }
 
 impl<'a, C> ComponentContainerTrait<'a> for Option<&'a ComponentContainer<C>>
@@ -213,59 +232,75 @@ where
     where
         Self: 'param;
 
-    fn get(&self, entity: Entity) -> Option<Self::Parameter<'_>> {
-        ComponentContainer::<C>::get(self.as_ref()?, entity)
+    fn get(&self, last_run_tick: u64, entity: Entity) -> Option<Self::Parameter<'_>> {
+        ComponentContainer::<C>::get(self.as_ref()?, last_run_tick, entity)
     }
 
-    fn get_mut(&mut self, entity: Entity) -> Option<Self::ParameterMut<'_>> {
-        ComponentContainer::<C>::get(self.as_mut()?, entity)
+    fn get_mut(
+        &mut self,
+        last_run_tick: u64,
+        current_tick: u64,
+        entity: Entity,
+    ) -> Option<Self::ParameterMut<'_>> {
+        _ = current_tick;
+        ComponentContainer::<C>::get(self.as_mut()?, last_run_tick, entity)
     }
 
     fn get_many_mut<const N: usize>(
         &mut self,
+        last_run_tick: u64,
+        current_tick: u64,
         entities: [Entity; N],
     ) -> Option<[Self::ParameterMut<'_>; N]> {
+        _ = current_tick;
         let container = self.as_mut()?;
 
         // this could be replaced with `.try_map` when its stablized which would remove the double-iteration
         if entities
             .iter()
-            .all(|&entity| container.get(entity).is_some())
+            .all(|&entity| container.get(last_run_tick, entity).is_some())
         {
-            Some(entities.map(|entity| container.get(entity).unwrap()))
+            Some(entities.map(|entity| container.get(last_run_tick, entity).unwrap()))
         } else {
             None
         }
     }
 
-    fn iter(&self) -> impl Iterator<Item = Option<Self::Parameter<'_>>> {
-        self.as_ref().into_iter().flat_map(|this| {
-            this.components.iter().map(|slot| {
+    fn iter(&self, last_run_tick: u64) -> impl Iterator<Item = Option<Self::Parameter<'_>>> {
+        self.as_ref().into_iter().flat_map(move |this| {
+            this.components.iter().map(move |slot| {
                 slot.as_ref().map(
                     |&ComponentSlot {
                          ref component,
-                         modified,
+                         last_modified_tick,
                          ..
                      }| Ref {
                         component,
-                        modified,
+                        last_modified_tick,
+                        last_run_tick,
                     },
                 )
             })
         })
     }
 
-    fn iter_mut(&mut self) -> impl Iterator<Item = Option<Self::ParameterMut<'_>>> {
-        self.as_mut().into_iter().flat_map(|this| {
-            this.components.iter().map(|slot| {
+    fn iter_mut(
+        &mut self,
+        last_run_tick: u64,
+        current_tick: u64,
+    ) -> impl Iterator<Item = Option<Self::ParameterMut<'_>>> {
+        _ = current_tick;
+        self.as_mut().into_iter().flat_map(move |this| {
+            this.components.iter().map(move |slot| {
                 slot.as_ref().map(
                     |&ComponentSlot {
                          ref component,
-                         modified,
+                         last_modified_tick,
                          ..
                      }| Ref {
                         component,
-                        modified,
+                        last_modified_tick,
+                        last_run_tick,
                     },
                 )
             })
@@ -284,49 +319,63 @@ where
     where
         Self: 'param;
 
-    fn get(&self, entity: Entity) -> Option<Self::Parameter<'_>> {
-        ComponentContainer::<C>::get(self.as_ref()?, entity)
+    fn get(&self, last_run_tick: u64, entity: Entity) -> Option<Self::Parameter<'_>> {
+        ComponentContainer::<C>::get(self.as_ref()?, last_run_tick, entity)
     }
 
-    fn get_mut(&mut self, entity: Entity) -> Option<Self::ParameterMut<'_>> {
-        ComponentContainer::<C>::get_mut(self.as_mut()?, entity)
+    fn get_mut(
+        &mut self,
+        last_run_tick: u64,
+        current_tick: u64,
+        entity: Entity,
+    ) -> Option<Self::ParameterMut<'_>> {
+        ComponentContainer::<C>::get_mut(self.as_mut()?, last_run_tick, current_tick, entity)
     }
 
     fn get_many_mut<const N: usize>(
         &mut self,
+        last_run_tick: u64,
+        current_tick: u64,
         entities: [Entity; N],
     ) -> Option<[Self::ParameterMut<'_>; N]> {
-        ComponentContainer::<C>::get_many_mut(self.as_mut()?, entities)
+        ComponentContainer::<C>::get_many_mut(self.as_mut()?, last_run_tick, current_tick, entities)
     }
 
-    fn iter(&self) -> impl Iterator<Item = Option<Self::Parameter<'_>>> {
-        self.as_ref().into_iter().flat_map(|this| {
-            this.components.iter().map(|slot| {
+    fn iter(&self, last_run_tick: u64) -> impl Iterator<Item = Option<Self::Parameter<'_>>> {
+        self.as_ref().into_iter().flat_map(move |this| {
+            this.components.iter().map(move |slot| {
                 slot.as_ref().map(
                     |&ComponentSlot {
                          ref component,
-                         modified,
+                         last_modified_tick,
                          ..
                      }| Ref {
                         component,
-                        modified,
+                        last_modified_tick,
+                        last_run_tick,
                     },
                 )
             })
         })
     }
 
-    fn iter_mut(&mut self) -> impl Iterator<Item = Option<Self::ParameterMut<'_>>> {
-        self.as_mut().into_iter().flat_map(|this| {
-            this.components.iter_mut().map(|slot| {
+    fn iter_mut(
+        &mut self,
+        last_run_tick: u64,
+        current_tick: u64,
+    ) -> impl Iterator<Item = Option<Self::ParameterMut<'_>>> {
+        self.as_mut().into_iter().flat_map(move |this| {
+            this.components.iter_mut().map(move |slot| {
                 slot.as_mut().map(
                     |ComponentSlot {
                          component,
-                         modified,
+                         last_modified_tick,
                          ..
                      }| RefMut {
                         component,
-                        modified,
+                        last_modified_tick,
+                        last_run_tick,
+                        current_tick,
                     },
                 )
             })
@@ -346,19 +395,29 @@ where
     where
         Self: 'param;
 
-    fn get(&self, entity: Entity) -> Option<Self::Parameter<'_>> {
-        Some(self.0.get(entity))
+    fn get(&self, last_run_tick: u64, entity: Entity) -> Option<Self::Parameter<'_>> {
+        Some(self.0.get(last_run_tick, entity))
     }
 
-    fn get_mut(&mut self, entity: Entity) -> Option<Self::ParameterMut<'_>> {
-        Some(self.0.get_mut(entity))
+    fn get_mut(
+        &mut self,
+        last_run_tick: u64,
+        current_tick: u64,
+        entity: Entity,
+    ) -> Option<Self::ParameterMut<'_>> {
+        Some(self.0.get_mut(last_run_tick, current_tick, entity))
     }
 
     fn get_many_mut<const N: usize>(
         &mut self,
+        last_run_tick: u64,
+        current_tick: u64,
         entities: [Entity; N],
     ) -> Option<[Self::ParameterMut<'_>; N]> {
-        let mut parameters = self.0.get_many_mut(entities).map(IntoIterator::into_iter);
+        let mut parameters = self
+            .0
+            .get_many_mut(last_run_tick, current_tick, entities)
+            .map(IntoIterator::into_iter);
         Some(std::array::from_fn(|_| {
             parameters
                 .as_mut()
@@ -366,12 +425,16 @@ where
         }))
     }
 
-    fn iter(&self) -> impl Iterator<Item = Option<Self::Parameter<'_>>> {
-        self.0.iter().map(Some)
+    fn iter(&self, last_run_tick: u64) -> impl Iterator<Item = Option<Self::Parameter<'_>>> {
+        self.0.iter(last_run_tick).map(Some)
     }
 
-    fn iter_mut(&mut self) -> impl Iterator<Item = Option<Self::ParameterMut<'_>>> {
-        self.0.iter_mut().map(Some)
+    fn iter_mut(
+        &mut self,
+        last_run_tick: u64,
+        current_tick: u64,
+    ) -> impl Iterator<Item = Option<Self::ParameterMut<'_>>> {
+        self.0.iter_mut(last_run_tick, current_tick).map(Some)
     }
 }
 
@@ -388,40 +451,53 @@ macro_rules! component_container_tuple {
             where
                 Self: 'param;
 
-            fn get(&self, entity: Entity) -> Option<Self::Parameter<'_>> {
+            fn get(&self, last_run_tick: u64, entity: Entity) -> Option<Self::Parameter<'_>> {
+                _ = last_run_tick;
                 _ = entity;
                 #[allow(non_snake_case)]
                 let ($($param,)*) = self;
-                Some(($($param.get(entity)?,)*))
+                Some(($($param.get(last_run_tick, entity)?,)*))
             }
 
-            fn get_mut(&mut self, entity: Entity) -> Option<Self::ParameterMut<'_>> {
+            fn get_mut(
+                &mut self,
+                last_run_tick: u64,
+                current_tick: u64,
+                entity: Entity,
+            ) -> Option<Self::ParameterMut<'_>> {
+                _ = last_run_tick;
+                _ = current_tick;
                 _ = entity;
                 #[allow(non_snake_case)]
                 let ($($param,)*) = self;
-                Some(($($param.get_mut(entity)?,)*))
+                Some(($($param.get_mut(last_run_tick, current_tick, entity)?,)*))
             }
 
             fn get_many_mut<const LEN: usize>(
                 &mut self,
+                last_run_tick: u64,
+                current_tick: u64,
                 entities: [Entity; LEN],
             ) -> Option<[Self::ParameterMut<'_>; LEN]> {
+                _ = last_run_tick;
+                _ = current_tick;
                 _ = entities;
                 #[allow(non_snake_case)]
                 let ($($param,)*) = self;
                 $(
                     #[allow(non_snake_case)]
-                    let mut $param = $param.get_many_mut(entities)?.into_iter();
+                    let mut $param = $param.get_many_mut(last_run_tick, current_tick, entities)?.into_iter();
                 )*
                 Some(std::array::from_fn(|_| ($($param.next().unwrap(),)*)))
             }
 
-            fn iter(&self) -> impl Iterator<Item = Option<Self::Parameter<'_>>> {
+            fn iter(&self, last_run_tick: u64) -> impl Iterator<Item = Option<Self::Parameter<'_>>> {
+                _ = last_run_tick;
                 #[allow(non_snake_case)]
                 let ($($param,)*) = self;
                 $(
                     #[allow(non_snake_case)]
-                    let mut $param = $param.iter();
+                    let mut $param = $param.iter(last_run_tick);
                 )*
                 std::iter::from_fn(move || {
                     $(
@@ -438,12 +514,18 @@ macro_rules! component_container_tuple {
                 })
             }
 
-            fn iter_mut(&mut self) -> impl Iterator<Item = Option<Self::ParameterMut<'_>>> {
+            fn iter_mut(
+                &mut self,
+                last_run_tick: u64,
+                current_tick: u64,
+            ) -> impl Iterator<Item = Option<Self::ParameterMut<'_>>> {
+                _ = last_run_tick;
+                _ = current_tick;
                 #[allow(non_snake_case)]
                 let ($($param,)*) = self;
                 $(
                     #[allow(non_snake_case)]
-                    let mut $param = $param.iter_mut();
+                    let mut $param = $param.iter_mut(last_run_tick, current_tick);
                 )*
                 std::iter::from_fn(move || {
                     $(
