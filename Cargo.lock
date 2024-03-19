@@ -166,6 +166,7 @@ version = "0.6.0"
 dependencies = [
  "thallium_derive",
  "thallium_ecs",
+ "thallium_renderer",
 ]
 
 [[package]]
@@ -183,6 +184,14 @@ version = "0.6.0"
 dependencies = [
  "parking_lot",
  "rayon",
+]
+
+[[package]]
+name = "thallium_renderer"
+version = "0.1.0"
+dependencies = [
+ "thallium_derive",
+ "thallium_ecs",
 ]
 
 [[package]]
