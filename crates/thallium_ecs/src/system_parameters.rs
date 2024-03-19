@@ -1,4 +1,4 @@
-use crate::system::{Borrow, RunState};
+use crate::system::{Borrow, SystemRunState};
 
 /// The trait for parameters to [`SystemFunction`](crate::SystemFunction)s
 pub trait SystemParameter: Send + Sync {
@@ -8,9 +8,9 @@ pub trait SystemParameter: Send + Sync {
     type Lock<'state>;
 
     /// Locks any state required for this [`SystemParameter`]
-    fn lock<'state>(state: &RunState<'state>) -> Self::Lock<'state>;
+    fn lock<'state>(state: &SystemRunState<'state>) -> Self::Lock<'state>;
     /// Constructs the [`SystemParameter`] from a lock
-    fn construct<'this>(state: &'this mut Self::Lock<'_>) -> Self::This<'this>;
+    fn construct<'this>(state: &'this mut Self::Lock<'_>, last_run_tick: u64) -> Self::This<'this>;
     /// Returns an iterator over all [`Resource`](crate::Resource) types that this system parameter will lock
     fn get_resource_types() -> impl Iterator<Item = Borrow>;
     /// Returns an iterator over all [`Component`](crate::Component) types that this system parameter will lock
@@ -27,16 +27,17 @@ macro_rules! system_parameter_tuple {
             type Lock<'state> = ($($param::Lock<'state>,)*);
 
             #[allow(clippy::unused_unit)]
-            fn lock<'state>(state: &RunState<'state>) -> Self::Lock<'state> {
+            fn lock<'state>(state: &SystemRunState<'state>) -> Self::Lock<'state> {
                 _ = state;
                 ($($param::lock(state),)*)
             }
 
             #[allow(clippy::unused_unit)]
-            fn construct<'this>(state: &'this mut Self::Lock<'_>) -> Self::This<'this> {
+            fn construct<'this>(state: &'this mut Self::Lock<'_>, last_run_tick: u64) -> Self::This<'this> {
+                _ = last_run_tick;
                 #[allow(non_snake_case)]
                 let ($($param,)*) = state;
-                ($($param::construct($param),)*)
+                ($($param::construct($param, last_run_tick),)*)
             }
 
             fn get_resource_types() -> impl Iterator<Item = Borrow> {

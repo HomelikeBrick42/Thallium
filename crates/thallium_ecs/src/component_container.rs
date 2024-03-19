@@ -1,4 +1,4 @@
-use crate::{Component, Entity};
+use crate::{Component, Entity, Ref, RefMut};
 use std::{any::Any, num::NonZeroUsize};
 
 pub(crate) trait DynComponentContainer: Send + Sync {
@@ -44,11 +44,20 @@ impl dyn DynComponentContainer {
     }
 }
 
+pub struct ComponentSlot<C>
+where
+    C: Component,
+{
+    pub(crate) generation: NonZeroUsize,
+    pub(crate) component: C,
+    pub(crate) last_modified_tick: u64,
+}
+
 pub struct ComponentContainer<C>
 where
     C: Component,
 {
-    pub(crate) components: Vec<Option<(NonZeroUsize, C)>>,
+    pub(crate) components: Vec<Option<ComponentSlot<C>>>,
 }
 
 impl<C> ComponentContainer<C>
@@ -61,47 +70,79 @@ where
         }
     }
 
-    pub(crate) fn insert(&mut self, entity: Entity, component: C) {
+    pub(crate) fn insert(&mut self, current_tick: u64, entity: Entity, component: C) {
         if entity.id >= self.components.len() {
             self.components.resize_with(entity.id + 1, || None);
         }
-        self.components[entity.id] = Some((entity.generation, component));
+        self.components[entity.id] = Some(ComponentSlot {
+            generation: entity.generation,
+            component,
+            last_modified_tick: current_tick,
+        });
     }
 
     pub(crate) fn remove(&mut self, entity: Entity) -> Option<C> {
-        if let Some(&Some((generation, _))) = self.components.get(entity.id) {
+        if let Some(&Some(ComponentSlot { generation, .. })) = self.components.get(entity.id) {
             if generation == entity.generation {
                 return self.components[entity.id]
                     .take()
-                    .map(|(_, component)| component);
+                    .map(|ComponentSlot { component, .. }| component);
             }
         }
         None
     }
 
-    pub(crate) fn get(&self, entity: Entity) -> Option<&C> {
+    pub(crate) fn get(&self, last_run_tick: u64, entity: Entity) -> Option<Ref<'_, C>> {
         self.components
             .get(entity.id)
             .and_then(|slot| slot.as_ref())
-            .and_then(|&(generation, ref component)| {
-                (generation == entity.generation).then_some(component)
-            })
+            .and_then(
+                |&ComponentSlot {
+                     generation,
+                     ref component,
+                     last_modified_tick,
+                 }| {
+                    (generation == entity.generation).then_some(Ref {
+                        component,
+                        last_modified_tick,
+                        last_run_tick,
+                    })
+                },
+            )
     }
 
-    pub(crate) fn get_mut(&mut self, entity: Entity) -> Option<&mut C> {
+    pub(crate) fn get_mut(
+        &mut self,
+        last_run_tick: u64,
+        current_tick: u64,
+        entity: Entity,
+    ) -> Option<RefMut<'_, C>> {
         self.components
             .get_mut(entity.id)
             .and_then(|slot| slot.as_mut())
-            .and_then(|&mut (generation, ref mut component)| {
-                (generation == entity.generation).then_some(component)
-            })
+            .and_then(
+                |&mut ComponentSlot {
+                     generation,
+                     ref mut component,
+                     ref mut last_modified_tick,
+                 }| {
+                    (generation == entity.generation).then_some(RefMut {
+                        component,
+                        last_modified_tick,
+                        last_run_tick,
+                        current_tick,
+                    })
+                },
+            )
     }
 
     #[allow(unsafe_code)]
     pub(crate) fn get_many_mut<const N: usize>(
         &mut self,
+        last_run_tick: u64,
+        current_tick: u64,
         entities: [Entity; N],
-    ) -> Option<[&mut C; N]> {
+    ) -> Option<[RefMut<'_, C>; N]> {
         // check that there are no invalid entities
         {
             let mut i = 0;
@@ -112,14 +153,19 @@ where
                 }
                 if !self.components[entity.id]
                     .as_ref()
-                    .map_or(false, |&(generation, _)| generation == entity.generation)
+                    .map_or(false, |&ComponentSlot { generation, .. }| {
+                        generation == entity.generation
+                    })
                 {
                     break;
                 }
 
                 // an odd generation number signals that its invalid, so later iterations cant see that this component is valid
                 unsafe {
-                    self.components[entity.id].as_mut().unwrap_unchecked().0 |= NonZeroUsize::MIN;
+                    self.components[entity.id]
+                        .as_mut()
+                        .unwrap_unchecked()
+                        .generation |= NonZeroUsize::MIN;
                 }
 
                 i += 1;
@@ -128,7 +174,10 @@ where
             // unset all the modified components to make them valid again
             for &entity in &entities[..i] {
                 unsafe {
-                    let generation = &mut self.components[entity.id].as_mut().unwrap_unchecked().0;
+                    let generation = &mut self.components[entity.id]
+                        .as_mut()
+                        .unwrap_unchecked()
+                        .generation;
                     *generation = NonZeroUsize::new_unchecked(generation.get() & !1usize);
                 }
             }
@@ -141,10 +190,17 @@ where
         unsafe {
             let components_ptr = self.components.as_mut_ptr();
             Some(entities.map(|entity| {
-                &mut (*components_ptr.add(entity.id))
-                    .as_mut()
-                    .unwrap_unchecked()
-                    .1
+                let ComponentSlot {
+                    component,
+                    last_modified_tick,
+                    ..
+                } = (*components_ptr.add(entity.id)).as_mut().unwrap_unchecked();
+                RefMut {
+                    component,
+                    last_modified_tick,
+                    last_run_tick,
+                    current_tick,
+                }
             }))
         }
     }
