@@ -8,10 +8,10 @@ mod entities;
 mod query;
 mod query_parameters;
 mod resource;
+mod resource_container;
 mod system;
 mod system_parameters;
 mod system_set;
-mod resource_container;
 
 pub use app::App;
 pub use commands::Commands;
