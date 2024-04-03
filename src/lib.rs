@@ -9,7 +9,6 @@ pub mod ecs {
     #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
     pub use thallium_derive::{Component, Resource};
 
-    #[cfg_attr(docsrs, doc(cfg(feature = "ecs")))]
     pub use thallium_ecs::*;
 }
 
@@ -17,6 +16,5 @@ pub mod ecs {
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub mod derive {
-    #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
     pub use thallium_derive::*;
 }
