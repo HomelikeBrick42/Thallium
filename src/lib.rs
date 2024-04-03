@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("../README.md")]
 
 /// An alias for [`thallium_ecs`], also with the related deives from [`thallium_derive`]

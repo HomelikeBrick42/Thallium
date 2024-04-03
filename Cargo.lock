@@ -162,7 +162,7 @@ dependencies = [
 
 [[package]]
 name = "thallium"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "thallium_derive",
  "thallium_ecs",
