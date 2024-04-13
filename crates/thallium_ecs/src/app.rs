@@ -116,12 +116,12 @@ impl App {
     }
 
     /// Runs a system with access to the [`App`]
-    pub fn run<S, Marker>(&mut self, system: S)
+    pub fn run<S, Marker>(&mut self, system: S) -> <S::System as System>::Output
     where
         S: IntoSystem<Marker>,
     {
         let (command_sender, command_receiver) = std::sync::mpsc::channel();
-        system.into_system().run(&SystemRunState {
+        let result = system.into_system().run(&SystemRunState {
             resources: &self.resources,
             entities: &self.entities,
             components: &self.components,
@@ -132,6 +132,7 @@ impl App {
         for command in command_receiver {
             command(self);
         }
+        result
     }
 
     /// Advances to the next tick, this effects stuff like modification checking

@@ -37,8 +37,11 @@ pub struct Borrow {
 
 /// An ECS system that can be added to a [`SystemSet`](crate::SystemSet)
 pub trait System: Send + Sync {
+    /// The output type of this [`System`]
+    type Output;
+
     /// Runs the system
-    fn run(&mut self, state: &SystemRunState<'_>);
+    fn run(&mut self, state: &SystemRunState<'_>) -> Self::Output;
     /// Returns an iterator over all [`Resource`](crate::Resource) types that this [`System`] will use
     fn get_resource_types(&self) -> impl Iterator<Item = Borrow> + '_
     where
@@ -71,9 +74,12 @@ impl<F, Marker> System for SystemFunctionWrapper<F, Marker>
 where
     F: SystemFunction<Marker>,
 {
-    fn run(&mut self, state: &SystemRunState<'_>) {
-        F::run(&mut self.func, state, self.last_run_tick);
+    type Output = F::Output;
+
+    fn run(&mut self, state: &SystemRunState<'_>) -> Self::Output {
+        let result = F::run(&mut self.func, state, self.last_run_tick);
         self.last_run_tick = state.current_tick;
+        result
     }
 
     fn get_resource_types(&self) -> impl Iterator<Item = Borrow> + '_
@@ -108,8 +114,11 @@ where
 
 /// The trait for functions which can be used as [`System`]s
 pub trait SystemFunction<Marker>: Send + Sync {
+    /// The output value of this [`SystemFunction`]
+    type Output;
+
     /// Runs the system
-    fn run(&mut self, state: &SystemRunState<'_>, last_run_tick: u64);
+    fn run(&mut self, state: &SystemRunState<'_>, last_run_tick: u64) -> Self::Output;
     /// Gets the [`Resource`](crate::Component) types that this [`SystemFunction`] will use
     fn get_resource_types() -> impl Iterator<Item = Borrow>;
     /// Gets the [`Component`](crate::Component) types that this [`SystemFunction`] will use
@@ -118,12 +127,14 @@ pub trait SystemFunction<Marker>: Send + Sync {
 
 macro_rules! system_function_impl {
     ($($param:ident),*) => {
-        impl<Func, $($param),*> SystemFunction<fn($($param),*)> for Func
+        impl<Func, Ret, $($param),*> SystemFunction<fn($($param),*) -> Ret> for Func
         where
-            for<'a> Func: FnMut($($param),*) + FnMut($($param::This<'a>),*) + Send + Sync,
+            for<'a> Func: FnMut($($param),*) -> Ret + FnMut($($param::This<'a>),*) -> Ret + Send + Sync,
             $($param: SystemParameter,)*
         {
-            fn run(&mut self, state: &SystemRunState<'_>, last_run_tick: u64) {
+            type Output = Ret;
+
+            fn run(&mut self, state: &SystemRunState<'_>, last_run_tick: u64) -> Self::Output {
                 _ = last_run_tick;
                 _ = state;
                 $(

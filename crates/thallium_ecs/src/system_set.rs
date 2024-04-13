@@ -8,7 +8,7 @@ use std::{any::TypeId, collections::HashMap};
 pub(crate) struct SystemGroup<'a> {
     resources: HashMap<TypeId, Borrow>,
     components: HashMap<TypeId, Borrow>,
-    systems: Vec<Box<dyn System + 'a>>,
+    systems: Vec<Box<dyn System<Output = ()> + 'a>>,
 }
 
 /// A set of [`System`]s that can be run in parallel
@@ -28,6 +28,7 @@ impl<'a> SystemSet<'a> {
     pub fn register_system<S, Marker>(&mut self, system: S)
     where
         S: IntoSystem<Marker>,
+        S::System: System<Output = ()>,
         S::System: 'a,
     {
         let system = system.into_system();
@@ -125,7 +126,9 @@ impl<'a> Default for SystemSet<'a> {
 }
 
 impl<'a> System for SystemSet<'a> {
-    fn run(&mut self, state: &SystemRunState<'_>) {
+    type Output = ();
+
+    fn run(&mut self, state: &SystemRunState<'_>) -> Self::Output {
         for system_group in &mut self.system_groups {
             system_group
                 .systems
@@ -184,7 +187,9 @@ impl<'a> System for SystemSet<'a> {
 }
 
 impl<'a> System for &mut SystemSet<'a> {
-    fn run(&mut self, state: &SystemRunState<'_>) {
+    type Output = ();
+
+    fn run(&mut self, state: &SystemRunState<'_>) -> Self::Output {
         SystemSet::run(self, state)
     }
 
