@@ -1,11 +1,12 @@
 #![doc = include_str!("../README.md")]
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use thallium_ecs::{App, ResMut, Resource};
 use thiserror::Error;
 use winit::{
     event::{Event, StartCause, WindowEvent},
     event_loop::{EventLoop, EventLoopWindowTarget},
+    keyboard::KeyCode,
 };
 
 #[doc(no_inline)]
@@ -31,6 +32,20 @@ impl WindowSize {
 }
 
 impl Resource for WindowSize {}
+
+/// The [`Resource`] for getting access to the keyboard
+///
+/// Because users of the crate cannot mutate this, it should always be requested using [`Res`](thallium_ecs::Res) in system parameters
+pub struct Keyboard {
+    keys: HashMap<KeyCode, KeyState>,
+}
+
+struct KeyState {
+    pressed: bool,
+    last_changed_tick: u64,
+}
+
+impl Resource for Keyboard {}
 
 /// Gives access to the winit window, when accepting this type in system parameters be aware that the system may not be running on the main thread
 /// Accepting the other `Window*` types into your systems is always preferred
