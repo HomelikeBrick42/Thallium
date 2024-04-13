@@ -80,8 +80,8 @@ pub fn run_window(
         elwt: &EventLoopWindowTarget<()>,
         window: &winit::window::Window,
         app: &mut App,
-        on_update: &mut impl FnMut(&mut App),
-        on_render: &mut impl FnMut(&mut App),
+        mut on_update: impl FnMut(&mut App),
+        mut on_render: impl FnMut(&mut App),
         on_quit: &mut Option<impl FnOnce(&mut App)>,
     ) -> Result<(), RunWindowError> {
         match event {
@@ -95,10 +95,7 @@ pub fn run_window(
                         window_size.height = new_size.height as _;
                     });
                 }
-                WindowEvent::CloseRequested => {
-                    elwt.exit();
-                }
-                WindowEvent::Destroyed => {
+                WindowEvent::CloseRequested | WindowEvent::Destroyed => {
                     elwt.exit();
                 }
                 WindowEvent::RedrawRequested => on_render(app),
@@ -132,8 +129,8 @@ pub fn run_window(
                 elwt,
                 &window,
                 app,
-                on_update,
-                on_render,
+                &mut *on_update,
+                &mut *on_render,
                 &mut on_quit,
             ));
             if error.is_err() {
