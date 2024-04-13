@@ -15,3 +15,9 @@ pub mod ecs {
 pub mod derive {
     pub use thallium_derive::*;
 }
+
+/// An alias for [`thallium_windowing`]
+#[cfg(feature = "windowing")]
+pub mod windowing {
+    pub use thallium_windowing::*;
+}
