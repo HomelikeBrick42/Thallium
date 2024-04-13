@@ -12,6 +12,7 @@ mod resource_container;
 mod system;
 mod system_parameters;
 mod system_set;
+mod tick;
 
 pub use app::App;
 pub use commands::Commands;
@@ -23,6 +24,7 @@ pub use resource::{Res, ResMut, Resource};
 pub use system::{IntoSystem, System, SystemFunction};
 pub use system_parameters::SystemParameter;
 pub use system_set::SystemSet;
+pub use tick::{CurrentTick, LastRunTick};
 
 #[cfg(test)]
 mod tests {
