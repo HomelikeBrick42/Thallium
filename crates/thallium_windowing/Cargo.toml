@@ -1,0 +1,15 @@
+[package]
+name = "thallium_windowing"
+version = "0.1.0"
+edition = "2021"
+description = "The windowing for the thallium crate"
+license = "MIT"
+repository = "https://github.com/HomelikeBrick42/Thallium"
+
+[dependencies]
+thallium_ecs = { path = "../thallium_ecs", version = "=0.6.0" }
+thiserror = "1.0.58"
+winit = "0.29.15"
+
+[lints]
+workspace = true
