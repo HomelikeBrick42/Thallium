@@ -1,15 +1,15 @@
 #![doc = include_str!("../README.md")]
 
+use std::sync::Arc;
 use thallium_ecs::{App, ResMut, Resource};
-
 use thiserror::Error;
-#[doc(no_inline)]
-pub use winit;
 use winit::{
     event::{Event, StartCause, WindowEvent},
     event_loop::{EventLoop, EventLoopWindowTarget},
-    window::Window,
 };
+
+#[doc(no_inline)]
+pub use winit;
 
 /// The resource for getting the window size
 /// Because users of the crate cannot mutate this, it should always be requested using [`Res`](thallium_ecs::Res) in system parameters
@@ -32,6 +32,15 @@ impl WindowSize {
 
 impl Resource for WindowSize {}
 
+/// Gives access to the winit window, when accepting this type in system parameters be aware that the system may not be running on the main thread
+/// Accepting the other `Window*` types into your systems is always preferred
+pub struct Window {
+    /// The [`winit::Window`](winit::window::Window)
+    pub window: Arc<winit::window::Window>,
+}
+
+impl Resource for Window {}
+
 /// The error returned from [`run_window`]
 #[derive(Debug, Error)]
 pub enum RunWindowError {
@@ -44,6 +53,8 @@ pub enum RunWindowError {
 }
 
 /// Creates the window specified by the builder, then runs the event loop
+/// This function should be called on the main thread
+///
 /// Check the docs for [`EventLoop::run`] for whether this function will ever return
 pub fn run_window(
     app: &mut App,
@@ -55,12 +66,19 @@ pub fn run_window(
     let event_loop = EventLoop::new()?;
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
 
-    let window = window_builder.with_visible(false).build(&event_loop)?;
+    let window = Arc::new(window_builder.with_visible(false).build(&event_loop)?);
+    app.add_resource(Window {
+        window: window.clone(),
+    });
+    app.add_resource(WindowSize {
+        width: window.inner_size().width as _,
+        height: window.inner_size().height as _,
+    });
 
     fn event_handler(
         event: Event<()>,
         elwt: &EventLoopWindowTarget<()>,
-        window: &Window,
+        window: &winit::window::Window,
         app: &mut App,
         on_update: &mut impl FnMut(&mut App),
         on_render: &mut impl FnMut(&mut App),
@@ -88,6 +106,7 @@ pub fn run_window(
             },
             Event::AboutToWait => {
                 on_update(app);
+                app.next_tick();
                 window.request_redraw();
             }
             Event::LoopExiting => {
