@@ -1,10 +1,10 @@
 #![doc = include_str!("../README.md")]
 
 use std::{collections::HashMap, sync::Arc};
-use thallium_ecs::{App, ResMut, Resource};
+use thallium_ecs::{App, CurrentTick, ResMut, Resource};
 use thiserror::Error;
 use winit::{
-    event::{Event, StartCause, WindowEvent},
+    event::{ElementState, Event, StartCause, WindowEvent},
     event_loop::{EventLoop, EventLoopWindowTarget},
     keyboard::KeyCode,
 };
@@ -38,11 +38,52 @@ impl Resource for WindowSize {}
 /// Because users of the crate cannot mutate this, it should always be requested using [`Res`](thallium_ecs::Res) in system parameters
 pub struct Keyboard {
     keys: HashMap<KeyCode, KeyState>,
+    current_tick: u64,
 }
 
 struct KeyState {
     pressed: bool,
     last_changed_tick: u64,
+}
+
+impl Keyboard {
+    /// Returns whether `key` is currently held down
+    pub fn key_down(&self, key: KeyCode) -> bool {
+        self.keys.get(&key).map_or(false, |state| state.pressed)
+    }
+
+    /// Returns whether `key` is not currently held down
+    pub fn key_up(&self, key: KeyCode) -> bool {
+        self.keys.get(&key).map_or(true, |state| !state.pressed)
+    }
+
+    /// Returns whether `key` was pressed this tick
+    pub fn key_pressed(&self, key: KeyCode) -> bool {
+        self.keys.get(&key).map_or(false, |state| {
+            state.pressed && self.current_tick == state.last_changed_tick
+        })
+    }
+
+    /// Returns whether `key` was released this tick
+    pub fn key_released(&self, key: KeyCode) -> bool {
+        self.keys.get(&key).map_or(false, |state| {
+            !state.pressed && self.current_tick == state.last_changed_tick
+        })
+    }
+
+    /// Returns whether `key` was pressed since `tick`
+    pub fn key_pressed_since(&self, key: KeyCode, tick: u64) -> bool {
+        self.keys.get(&key).map_or(false, |state| {
+            state.pressed && tick > state.last_changed_tick
+        })
+    }
+
+    /// Returns whether `key` was released since `tick`
+    pub fn key_released_since(&self, key: KeyCode, tick: u64) -> bool {
+        self.keys.get(&key).map_or(false, |state| {
+            !state.pressed && tick > state.last_changed_tick
+        })
+    }
 }
 
 impl Resource for Keyboard {}
@@ -103,6 +144,9 @@ pub fn run_window(
             Event::NewEvents(StartCause::Init) => {
                 window.set_visible(true);
             }
+            Event::NewEvents(StartCause::Poll) => {
+                app.next_tick();
+            }
             Event::WindowEvent { window_id, event } if window_id == window.id() => match event {
                 WindowEvent::Resized(new_size) => {
                     app.run(|mut window_size: ResMut<'_, WindowSize>| {
@@ -113,12 +157,35 @@ pub fn run_window(
                 WindowEvent::CloseRequested | WindowEvent::Destroyed => {
                     elwt.exit();
                 }
+                WindowEvent::KeyboardInput {
+                    device_id: _,
+                    event,
+                    is_synthetic: _,
+                } => match event.physical_key {
+                    winit::keyboard::PhysicalKey::Code(key_code) => app.run(
+                        |mut keyboard: ResMut<'_, Keyboard>,
+                         CurrentTick(current_tick): CurrentTick| {
+                            keyboard.keys.insert(
+                                key_code,
+                                KeyState {
+                                    pressed: matches!(event.state, ElementState::Pressed),
+                                    last_changed_tick: current_tick,
+                                },
+                            );
+                        },
+                    ),
+                    winit::keyboard::PhysicalKey::Unidentified(_) => {}
+                },
                 WindowEvent::RedrawRequested => on_render(app),
                 _ => {}
             },
             Event::AboutToWait => {
+                app.run(
+                    |mut keyboard: ResMut<'_, Keyboard>, CurrentTick(current_tick): CurrentTick| {
+                        keyboard.current_tick = current_tick;
+                    },
+                );
                 on_update(app);
-                app.next_tick();
                 window.request_redraw();
             }
             Event::LoopExiting => {
